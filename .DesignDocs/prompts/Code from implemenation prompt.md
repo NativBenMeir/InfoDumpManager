@@ -1,58 +1,17 @@
-# GEM Ingestion System - Multi-Agent Implementation Prompt
-
-## Overview
-You are part of a development team implementing the GEM (Generated Enriched Memory) Ingestion, Summarization, and Smart Categorization system according to the Implementation Plan v1.0 located at:
-`docs/ways-of-work/plan/gem-ingestion-categorization/implementation-plan-1.md`
-
-The project is being built with .NET 8.0, ASP.NET Core, PostgreSQL with pgvector, Docker, and AI integration with OpenAI/Azure OpenAI.
+# GEM Ingestion System - Phase Implementation Prompt
 
 ## Your Role
-You are assigned to implement **Phase [X]** of the 4-phase delivery plan. Multiple agents are working in parallel on different phases and components. Coordinate through clear documentation and well-structured code.
+You are part of a development team implementing the InfoDumpManager system. The development has been blocken down into phases, each phase will be completed before moving to the following phase.
 
-## Implementation Phases (Choose One)
-
-### **Agent 1: Phase 1 - Foundation & Basic Ingestion (TASK-001 to TASK-030)**
-- Set up .NET 8 solution structure and Docker Compose environment
-- Design domain model (GEM, Category, User, ActivityLog aggregates)
-- Implement PostgreSQL schema and repositories
-- Build basic Web API and Razor Pages UI
-- Implement web scraping service and manual categorization
-
-**Key Deliverable**: Working solution with URL ingestion, manual categorization, and basic API
-
-### **Agent 2: Phase 2 - AI Summarization & Auto-Categorization (TASK-031 to TASK-060)**
-- Build LLM provider abstraction layer (OpenAI, Azure OpenAI)
-- Implement background job processing infrastructure
-- Create AI summarization and categorization services
-- Add UI for viewing summaries and accepting AI suggestions
-- Integrate metrics and error handling
-
-**Key Deliverable**: Fully functional AI-powered summarization and categorization with confidence thresholds
-
-### **Agent 3: Phase 3 - Tagging, Search & Q&A Synthesis (TASK-061 to TASK-095)**
-- Design Tag entity and pgvector embedding columns
-- Implement semantic embedding generation and vector search
-- Create AI tagging service with tag suggestion
-- Build hybrid search (full-text + semantic)
-- Implement RAG-based Q&A and category synthesis endpoints
-
-**Key Deliverable**: Complete search, tagging, and Q&A capabilities with semantic understanding
-
-### **Agent 4: Phase 4 - Polish, Observability & Production Readiness (TASK-096 to TASK-128)**
-- Implement centralized logging (Serilog, Seq/ELK)
-- Set up distributed tracing (OpenTelemetry)
-- Configure Prometheus metrics and Grafana dashboards
-- Optimize database queries and implement caching
-- Create operational runbooks and production Docker Compose
-
-**Key Deliverable**: Production-ready system with full observability, security hardening, and load testing validation
+## Your Responsiblity
+You are assigned to implement the phase based on  according to the Implementation Plan {{Input:PhasePlan}}. 
 
 ## Implementation Guidelines
 
 ### 1. **Reference the Plan**
-- Consult `implementation-plan-1.md` for your assigned phase
+- Consult {{Input:PhasePlan}} for your assigned phase
 - Follow the task list sequentially (TASK-XXX numbering)
-- Implement all requirements, non-functional requirements, and design patterns specified in Section 1
+- Implement all requirements, non-functional requirements, and design patterns specified 
 
 ### 2. **Architecture & Design**
 - Follow **Domain-Driven Design** patterns: Aggregates, Entities, Value Objects
