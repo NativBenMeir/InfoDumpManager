@@ -1,0 +1,53 @@
+# GEM Aggregator — .NET + Azure (AKS) Design
+
+## Overview
+- **Architecture:** Modular monorepo, three deployables: API, Worker, Web. Shared library for models/contracts. Not microservices; single Postgres.
+- **Core Flow:** Ingest sources (web, email, RSS) → summarize → store GEM (link, snapshot, summary) → categorize (match or create) → vector + text search → category-level QA/feedback via RAG.
+
+## Projects
+- **Gem.Api (ASP.NET Core 8)**: REST endpoints for Gems, Categories, Search, QA. Auth via Entra ID. Validation via FluentValidation. Observability via Application Insights + OpenTelemetry.
+- **Gem.Worker (Hosted Service / Hangfire)**: Jobs for Ingest, Summarize, Categorize, Feedback. Queue: Azure Service Bus. Caching/job state: Azure Cache for Redis. HTTP fetch (HtmlAgilityPack/AngleSharp), Email (MailKit/Graph), RSS (SyndicationFeed).
+- **Gem.Web (Blazor Server or WASM + ASP.NET Core)**: UI for GEM cards, category tree, search, QA console. Optional SignalR for live updates.
+- **Gem.Shared**: Models/DTOs (Gem, Category, Feedback), Interfaces (IAiService, IVectorStoreService, IConnectorService), cross-cutting utilities.
+
+## Data
+- **Primary DB:** Azure Database for PostgreSQL Flexible Server + pgvector.
+- **Schema (core tables):** User, Source, Gem, Category, GemCategory, Feedback, JobLog. Gems store URL, title, summary, snapshot_uri, embedding vector, timestamps.
+- **Storage:** Azure Blob Storage for HTML snapshots/attachments.
+- **Search:** Hybrid Postgres FTS + pgvector ANN. Category-filtered vector queries for RAG.
+
+## AI
+- **Provider:** Azure OpenAI (GPT-5.1-Codex-Max).
+- **Tasks:** Summarization, Categorization (zero-shot + similarity threshold), Category QA/Feedback (RAG with citations).
+- **Embeddings:** text-embedding-3-large (Azure deployment). Store vectors in pgvector.
+- **Prompts:** Structured prompt templates for summarize, categorize, QA with citations.
+
+## Job Orchestration
+- **Queue:** Azure Service Bus (topics/queues).
+- **Scheduler:** Hangfire (backed by Redis) or Service Bus scheduled messages for periodic feedback runs.
+- **Patterns:** Idempotent jobs, retries with backoff, poison queue, dedup by source hash.
+
+## Security
+- **AuthN/Z:** Microsoft Entra ID (OAuth2/OIDC), optional B2C. Role-based authorization.
+- **Secrets:** Azure Key Vault; apps use managed identity.
+- **Transport:** HTTPS end-to-end; signed URLs for blobs.
+- **Sanitization:** HTML sanitization on ingest; MIME-safe email parsing.
+
+## Infra (AKS)
+- **Images:** Built with dockerfiles per app; push to Azure Container Registry (ACR).
+- **Deployments/Services:** api, worker, web; HPA with CPU/latency targets. Redis and Service Bus are managed; Postgres managed.
+- **Ingress:** NGINX ingress controller with TLS (App Gateway or cert-manager).
+- **Config:** ConfigMaps for non-secrets; Secrets for connection strings/keys (sourced from Key Vault).
+- **Observability:** App Insights + OTEL exporter; Prometheus scraping enabled; dashboards for latency, queue depth, job failures.
+
+## CI/CD
+- **GitHub Actions/Azure DevOps:** Build, test, publish images to ACR; deploy to AKS via kubeconfig/federated credentials.
+- **Quality gates:** dotnet format, analyzers, unit/integration tests, minimal e2e smoke (ingest → summarize → categorize → QA).
+
+## Key APIs
+- **POST /gems** (ingest request), **GET /gems/{id}**, **GET /categories**, **POST /categories**, **POST /qa** (category-scoped QA), **GET /search** (hybrid search with filters).
+
+## Migration/Scale Notes
+- Start single Postgres; add read replicas if needed.
+- Swap Hangfire/Redis for Service Bus + Durable Functions if you prefer serverless orchestration.
+- Consider Cosmos DB only when global active-active or RU-based scaling is required.
