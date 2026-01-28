@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "a2eG/9vd1XvmOwrGW7j29KbYm49y+W37mNZZCbLLa3c=",
+  "Source": "InfoDumpManager.WebAPI",
+  "BasePath": "_content/InfoDumpManager.WebAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

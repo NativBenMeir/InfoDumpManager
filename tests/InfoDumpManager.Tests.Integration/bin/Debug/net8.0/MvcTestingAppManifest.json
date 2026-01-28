@@ -1,0 +1,7 @@
+{
+  "InfoDumpManager.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\InfoDumpManager\\src\\InfoDumpManager.Application",
+  "InfoDumpManager.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\InfoDumpManager\\src\\InfoDumpManager.Domain",
+  "InfoDumpManager.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\InfoDumpManager\\src\\InfoDumpManager.Infrastructure",
+  "InfoDumpManager.Web, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\InfoDumpManager\\src\\InfoDumpManager.Web",
+  "InfoDumpManager.WebAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Code\\InfoDumpManager\\src\\InfoDumpManager.WebAPI"
+}
