@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\InfoDumpManager.WebAPI.props" />
-</Project>
