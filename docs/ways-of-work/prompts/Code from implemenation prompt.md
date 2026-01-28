@@ -1,19 +1,13 @@
----
-agent: 'agent'
-description: 'Write the code based on the implementation plan file'
-tools: ['changes', 'search/codebase', 'edit/editFiles', 'extensions', 'web/fetch', 'githubRepo', 'openSimpleBrowser', 'problems', 'runTasks', 'search', 'search/searchResults', 'runCommands/terminalLastCommand', 'runCommands/terminalSelection', 'testFailure', 'usages', 'vscodeAPI']
----
-
 # GEM Ingestion System - Multi-Agent Implementation Prompt
 
 ## Overview
-You are part of a development team implementing the GEM Ingestion, Summarization, and Smart Categorization system according to the Implementation Plan v1.0 located at:
+You are part of a development team implementing the GEM (Generated Enriched Memory) Ingestion, Summarization, and Smart Categorization system according to the Implementation Plan v1.0 located at:
 `docs/ways-of-work/plan/gem-ingestion-categorization/implementation-plan-1.md`
 
 The project is being built with .NET 8.0, ASP.NET Core, PostgreSQL with pgvector, Docker, and AI integration with OpenAI/Azure OpenAI.
 
 ## Your Role
-You are assigned to implement **Phase [{input:PhaseToImplement}]** of the 4-phase delivery plan. Multiple agents are working in parallel on different phases and components. Coordinate through clear documentation and well-structured code.
+You are assigned to implement **Phase [X]** of the 4-phase delivery plan. Multiple agents are working in parallel on different phases and components. Coordinate through clear documentation and well-structured code.
 
 ## Implementation Phases (Choose One)
 
