@@ -24,6 +24,7 @@ try
 
     // Add services to the container.
     builder.Services.AddEndpointsApiExplorer();
+    
     builder.Services.AddSwaggerGen(options =>
     {
         options.SwaggerDoc("v1", new OpenApiInfo

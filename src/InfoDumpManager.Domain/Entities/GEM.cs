@@ -88,4 +88,15 @@ public sealed class GEM : AggregateRoot<Guid>, ITenantEntity
         IsDeleted = true;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    public void UpdateTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new ArgumentException("Title cannot be empty.", nameof(title));
+        }
+
+        Title = title.Trim();
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }
