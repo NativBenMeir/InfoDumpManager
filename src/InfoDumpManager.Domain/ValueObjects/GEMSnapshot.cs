@@ -31,6 +31,11 @@ public sealed class GEMSnapshot : ValueObject
         CapturedAt = capturedAt ?? DateTimeOffset.UtcNow;
     }
 
+    /// <summary>
+    /// Creates a defensive copy of the GEMSnapshot.
+    /// </summary>
+    public GEMSnapshot Copy() => new(HtmlContent, MimeType, CapturedAt);
+
     protected override IEnumerable<object?> GetEqualityComponents()
     {
         yield return HtmlContent;

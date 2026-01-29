@@ -29,6 +29,11 @@ public sealed class GEMSource : ValueObject
         Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim();
     }
 
+    /// <summary>
+    /// Creates a defensive copy of the GEMSource.
+    /// </summary>
+    public GEMSource Copy() => new(Url, Title);
+
     protected override IEnumerable<object?> GetEqualityComponents()
     {
         yield return Url;
