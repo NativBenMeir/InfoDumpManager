@@ -21,7 +21,7 @@ This phase implements the web scraping and content ingestion pipeline. It integr
 
 - **REQ-001**: System must ingest web pages via URL submission with headless browser rendering
 - **REQ-010**: System must store original web page snapshots with source links
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
 - **NFR-001**: Ingestion + summarization must complete in < 15 seconds (p95) for typical web pages
@@ -63,6 +63,7 @@ This phase implements the web scraping and content ingestion pipeline. It integr
 | TASK-041-P5 | Implement URL validation and normalization in web scraping service | | |
 | TASK-042-P5 | Implement HTML sanitization to remove scripts and unsafe content from snapshots | | |
 | TASK-043-P5 | Create integration tests for web scraping service using mock web server | | |
+| TASK-TST-P5 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

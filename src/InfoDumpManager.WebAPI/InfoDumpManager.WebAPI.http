@@ -1,0 +1,6 @@
+@InfoDumpManager.WebAPI_HostAddress = http://localhost:5197
+
+GET {{InfoDumpManager.WebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

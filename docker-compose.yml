@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: infodump-postgres
+    environment:
+      POSTGRES_USER: infodump
+      POSTGRES_PASSWORD: dev_password_change_in_production
+      POSTGRES_DB: infodumpmanager
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infodump -d infodumpmanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - infodump-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: infodump-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - infodump-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: infodump-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - infodump-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: infodump-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - infodump-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  infodump-network:
+    driver: bridge

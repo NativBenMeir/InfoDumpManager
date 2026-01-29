@@ -20,7 +20,7 @@ This phase implements authentication and authorization infrastructure using ASP.
 ## 1. Requirements & Constraints
 
 - **REQ-005**: System must provide manual category management (create, rename, merge, delete, reassign)
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-003**: Must use ASP.NET Core for all web applications and APIs
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
@@ -64,6 +64,7 @@ This phase implements authentication and authorization infrastructure using ASP.
 | TASK-018 | Implement FluentValidation 12.1.1 validators for all commands and DTOs | | |
 | TASK-028 | Implement basic error handling middleware with structured error responses | | |
 | TASK-038-P4 | Configure claims-based authorization policies for multi-tenancy support | | |
+| TASK-TST-P4 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

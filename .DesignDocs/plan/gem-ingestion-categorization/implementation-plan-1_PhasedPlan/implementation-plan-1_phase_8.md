@@ -20,7 +20,7 @@ This phase implements AI-powered summarization with background job processing in
 ## 1. Requirements & Constraints
 
 - **REQ-002**: System must generate AI-powered summaries for all ingested content
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
 - **CON-007**: All background processing must use IHostedService/BackgroundService patterns
@@ -62,6 +62,7 @@ This phase implements AI-powered summarization with background job processing in
 | TASK-047 | Modify CreateGEMCommand handler to enqueue summarization job after saving GEM | | |
 | TASK-048 | Implement webhook or polling mechanism to notify Web UI when summarization completes (SignalR or simple polling) | | |
 | TASK-059 | Document prompt engineering decisions and version history in docs/prompts/ directory | | |
+| TASK-TST-P8 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

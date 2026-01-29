@@ -23,7 +23,7 @@ This phase completes the AI-powered features by implementing semantic tagging, v
 - **REQ-006**: System must provide manual tag management (create, rename, delete, apply, remove)
 - **REQ-007**: System must support full-text and semantic search across GEMs
 - **REQ-008**: System must provide on-demand category-level synthesis and Q&A
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-002**: Must use PostgreSQL 16.11 with pgvector extension for data persistence
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
@@ -64,6 +64,7 @@ This phase completes the AI-powered features by implementing semantic tagging, v
 | TASK-066 | Implement embedding generation service that calls LLM provider for text → vector conversion | | |
 | TASK-067 | Implement background service to generate embeddings for existing GEMs (backfill job) | | |
 | TASK-068 | Modify CreateGEMCommand handler to generate embeddings after summarization completes | | |
+| TASK-TST-P10 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

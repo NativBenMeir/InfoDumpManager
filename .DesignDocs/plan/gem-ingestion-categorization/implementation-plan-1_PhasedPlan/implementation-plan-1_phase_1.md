@@ -15,13 +15,13 @@ status_color: blue
 
 ![Status: Planned](https://img.shields.io/badge/Status-Planned-blue)
 
-This phase establishes the foundational development environment and solution structure for the GEM system. It sets up the .NET 10.0 solution architecture following domain-driven design principles, configures Docker Compose for local development dependencies (PostgreSQL, Redis, MinIO), and establishes the basic project structure. This phase ensures all developers have a consistent, reproducible development environment before any code implementation begins.
+This phase establishes the foundational development environment and solution structure for the GEM system. It sets up the .NET 8.0 solution architecture following domain-driven design principles, configures Docker Compose for local development dependencies (PostgreSQL, Redis, MinIO), and establishes the basic project structure. This phase ensures all developers have a consistent, reproducible development environment before any code implementation begins.
 
 ## 1. Requirements & Constraints
 
 - **REQ-001**: System must ingest web pages via URL submission with headless browser rendering
 - **REQ-010**: System must store original web page snapshots with source links
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-002**: Must use PostgreSQL 16.11 with pgvector extension for data persistence
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
@@ -55,12 +55,12 @@ This phase establishes the foundational development environment and solution str
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Set up .NET 10.0 solution structure with projects: Domain, Application, Infrastructure, WebAPI, Web, Tests.Unit, Tests.Integration | | |
-| TASK-002 | Configure Docker Compose with PostgreSQL 16.11 + pgvector extension, Redis, MinIO, and development nginx reverse proxy | | |
-| TASK-024 | Set up Serilog 4.3.0 with console and file sinks for development logging | | |
-| TASK-025 | Configure Swagger/NSwag for API documentation and client generation | | |
-| TASK-029 | Create initial database seed data with sample categories for development | | |
-| TASK-030 | Document Phase 1 API endpoints with examples in README or docs/api.md | | |
+| TASK-001 | Set up .NET 8.0 solution structure with projects: Domain, Application, Infrastructure, WebAPI, Web, Tests.Unit, Tests.Integration | Yes | 2026-01-28 |
+| TASK-002 | Configure Docker Compose with PostgreSQL 16.11 + pgvector extension, Redis, MinIO, and development nginx reverse proxy | Yes | 2026-01-28 |
+| TASK-024 | Set up Serilog 4.3.0 with console and file sinks for development logging | Yes | 2026-01-28 |
+| TASK-025 | Configure Swagger/NSwag for API documentation and client generation | Yes | 2026-01-28 |
+| TASK-029 | Create initial database seed data with sample categories for development | Yes | 2026-01-28 |
+| TASK-030 | Document Phase 1 API endpoints with examples in README or docs/api.md | Yes | 2026-01-28 |
 
 ## 3. Alternatives
 
@@ -74,7 +74,7 @@ This phase establishes the foundational development environment and solution str
 - **DEP-004**: Redis - Required for distributed caching and session management
 - **DEP-005**: MinIO or S3-Compatible Storage - Required for storing web page snapshots
 - **DEP-006**: Docker and Docker Compose - Required for containerized deployment
-- **DEP-007**: .NET 10.0 SDK - Development environment requirement. Must be installed before development starts
+- **DEP-007**: .NET 8.0 SDK - Development environment requirement. Must be installed before development starts
 - **DEP-010**: Serilog 4.3.0 - Structured logging framework
 
 ## 5. Files
@@ -113,7 +113,7 @@ This phase establishes the foundational development environment and solution str
 - **RISK-001**: Docker environment issues on different platforms (Windows/macOS/Linux) - Mitigation: Provide platform-specific documentation
 - **RISK-002**: pgvector extension compatibility issues - Mitigation: Use official PostgreSQL Docker image with verified pgvector installation
 - **ASSUMPTION-001**: Developers have Docker Desktop installed and running
-- **ASSUMPTION-002**: Developers have .NET 10.0 SDK installed
+- **ASSUMPTION-002**: Developers have .NET 8.0 SDK installed
 - **ASSUMPTION-003**: Development machines have sufficient resources (8GB RAM minimum)
 
 ## 8. Success Metrics
@@ -128,6 +128,6 @@ This phase establishes the foundational development environment and solution str
 ## 9. Related Specifications / Further Reading
 
 - [GEM Epic Architecture Specification](../epic-architecture-specification.md)
-- [.NET 10.0 Documentation](https://docs.microsoft.com/en-us/dotnet/)
+- [.NET 8.0 Documentation](https://docs.microsoft.com/en-us/dotnet/)
 - [PostgreSQL pgvector Extension](https://github.com/pgvector/pgvector)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)

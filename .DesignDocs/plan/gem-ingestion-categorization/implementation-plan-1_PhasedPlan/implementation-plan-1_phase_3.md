@@ -21,7 +21,7 @@ This phase implements the core domain model following domain-driven design princ
 
 - **REQ-001**: System must ingest web pages via URL submission with headless browser rendering
 - **REQ-010**: System must store original web page snapshots with source links
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
 - **CON-006**: Must use Entity Framework Core for Phase 1-3
@@ -63,6 +63,7 @@ This phase implements the core domain model following domain-driven design princ
 | TASK-027 | Write integration tests for GEM and Category API endpoints using Testcontainers 4.10.0 for PostgreSQL | | |
 | TASK-036-P3 | Implement domain validation rules for GEM aggregate (URL validation, required fields) | | |
 | TASK-037-P3 | Implement domain validation rules for Category aggregate (name uniqueness, hierarchy constraints) | | |
+| TASK-TST-P3 | Implement all tests based on per Testing section in this plan. | | |
 
 ## 3. Alternatives
 
@@ -74,7 +75,7 @@ This phase implements the core domain model following domain-driven design princ
 - **PHASE-DEP-002**: Requires database schema from Phase 2 - Verify all tables exist and migrations applied
 - **DEP-002**: `src/InfoDumpManager.Domain/InfoDumpManager.Domain.csproj` - Domain layer project
 - **DEP-004**: `src/InfoDumpManager.Infrastructure/InfoDumpManager.Infrastructure.csproj` - Infrastructure layer
-- **DEP-011**: Entity Framework Core 10.0.2 - ORM for data access
+- **DEP-011**: Entity Framework Core 8.0.x - ORM for data access
 - **DEP-017**: xUnit v3, FluentAssertions 8.8.0, Moq 4.20.72 - Unit testing frameworks
 
 ## 5. Files

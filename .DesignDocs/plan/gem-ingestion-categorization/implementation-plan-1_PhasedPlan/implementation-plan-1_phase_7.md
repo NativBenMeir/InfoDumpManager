@@ -21,7 +21,7 @@ This phase establishes the foundation for AI-powered features by implementing th
 
 - **REQ-002**: System must generate AI-powered summaries for all ingested content
 - **REQ-003**: System must support automatic categorization using AI analysis of content and existing category structure
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
 - **CON-008**: Must abstract LLM provider to support OpenAI, Azure OpenAI, and local models
@@ -62,6 +62,7 @@ This phase establishes the foundation for AI-powered features by implementing th
 | TASK-038 | Implement Polly 8.6.5 retry policies and circuit breaker for LLM API calls with exponential backoff | | |
 | TASK-056 | Write unit tests using xUnit v3, FluentAssertions 8.8.0, and Moq 4.20.72 for LLM provider abstraction and mock LLM responses for deterministic testing | | |
 | TASK-047-P7 | Implement LLM provider factory for runtime provider selection based on configuration | | |
+| TASK-TST-P7 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

@@ -20,7 +20,7 @@ This phase delivers the user-facing web interface using ASP.NET Core Razor Pages
 ## 1. Requirements & Constraints
 
 - **REQ-005**: System must provide manual category management (create, rename, merge, delete, reassign)
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-003**: Must use ASP.NET Core for all web applications and APIs
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
@@ -62,6 +62,7 @@ This phase delivers the user-facing web interface using ASP.NET Core Razor Pages
 | TASK-044-P6 | Implement responsive design for mobile and tablet devices | | |
 | TASK-045-P6 | Add client-side form validation for GEM submission | | |
 | TASK-046-P6 | Implement breadcrumb navigation and page titles for all pages | | |
+| TASK-TST-P6 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

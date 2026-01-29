@@ -23,7 +23,7 @@ This phase implements AI-powered automatic categorization and semantic tagging, 
 - **REQ-004**: System must generate and apply semantic tags for both intra-category and cross-category linking
 - **REQ-006**: System must provide manual tag management (create, rename, delete, apply, remove)
 - **REQ-007**: System must support full-text and semantic search across GEMs
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-002**: Must use PostgreSQL 16.11 with pgvector extension for data persistence
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
@@ -65,6 +65,7 @@ This phase implements AI-powered automatic categorization and semantic tagging, 
 | TASK-054 | Add activity log entries for AI operations: SummarizationCompleted, CategorizationSuggested, CategorizationAccepted | | |
 | TASK-055 | Implement Redis caching for frequently accessed categories to reduce database queries during categorization | | |
 | TASK-057 | Write integration tests for summarization and categorization workflows using test LLM provider or mocked responses | | |
+| TASK-TST-P9 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 

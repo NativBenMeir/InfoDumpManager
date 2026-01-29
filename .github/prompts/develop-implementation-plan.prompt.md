@@ -1,14 +1,14 @@
 ---
 agent: agent
 description: This prompt is used to guide the implementation of a software project phase based on a detailed implementation plan.
-model:  GPT-5.2-Codex-mini
-tools: ['todo']
+argument-hint: Set variable ImplementationPlan to implementation plan file and any necessary context to begin.
+model: GPT-5.1-Codex-Mini (Preview) (copilot)
 ---
 
 ## Your Role
 
 You are implementing a specific phase of a software project according to a detailed implementation plan. Your goal is to execute the plan precisely, systematically, and with high quality.
-The plan file is provided as {{Input:ImplementationPlan}}.
+The plan file is provided as ${Input:ImplementationPlan}.
 
 ## Core Directives
 
@@ -38,6 +38,12 @@ If you encounter a situation requiring deviation from the plan:
 - Mark tasks as in-progress when starting, completed when finished
 - Work systematically through tasks in order unless dependencies require otherwise
 - Update the task table in the plan file as you complete each task
+
+- When starting to implement, update Status in the implementation plan file to `In progress` (yellow badge)
+- Upon completing all tasks, update Status to `Completed` (bright green badge)
+
+### Test tracking
+- View each test as a separate task, using  the `manage_todo_list` tool to track progress.
 
 ## Code Quality Standards
 
@@ -82,6 +88,9 @@ If you encounter a situation requiring deviation from the plan:
 - Use meaningful test names that describe the scenario
 - Follow AAA pattern: Arrange, Act, Assert
 - Ensure tests are independent and can run in any order
+- Under Implementation section add two task for writing tests: 
+  "TASK-AUT| Implement all Unit tests based on per Testing section in this plan."
+  "TASK-AIT| Implement all Integration  tests based on per Testing section in this plan."
 
 ### Security
 
@@ -122,6 +131,10 @@ If you encounter a situation requiring deviation from the plan:
 - Be concise but clear in explanations
 - When encountering issues, describe the problem and what you've tried
 - Ask clarifying questions if plan requirements are ambiguous
+
+## Documentation of process
+- All documentation of implementation to be saved in folder `.DesignDocs\ImplementationProcessReports`.
+- Prefix all documentation documents names with `${Input:ImplementationPlan}_`
 
 ## What NOT to Do
 

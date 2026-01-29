@@ -47,7 +47,7 @@ The system will enable users to capture web content, automatically generate AI-p
 - **SEC-005**: Store all secrets in environment variables or secure vaults (not in code)
 
 ### Architectural Constraints
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-002**: Must use PostgreSQL 16.11 with pgvector extension for data persistence
 - **CON-003**: Must use ASP.NET Core for all web applications and APIs
 - **CON-004**: Must follow domain-driven design with clear layer separation
@@ -85,7 +85,7 @@ The system will enable users to capture web content, automatically generate AI-p
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Set up .NET 10.0 solution structure with projects: Domain, Application, Infrastructure, WebAPI, Web, Tests.Unit, Tests.Integration | | |
+| TASK-001 | Set up .NET 8.0 solution structure with projects: Domain, Application, Infrastructure, WebAPI, Web, Tests.Unit, Tests.Integration | | |
 | TASK-002 | Configure Docker Compose with PostgreSQL 16.11 + pgvector extension, Redis, MinIO, and development nginx reverse proxy | | |
 | TASK-003 | Design and implement GEM Aggregate in Domain layer with entities: GEM, GEMSource (value object), GEMSnapshot (value object), GEMSummary (value object) | | |
 | TASK-004 | Design and implement Category Aggregate with Category entity and GEM assignments | | |
@@ -275,7 +275,7 @@ The system will enable users to capture web content, automatically generate AI-p
 
 ### Library and Framework Dependencies
 
-- **DEP-007**: **.NET 10.0 SDK** - Development environment requirement. Must be installed before development starts.
+- **DEP-007**: **.NET 8.0 SDK** - Development environment requirement. Must be installed before development starts.
 
 - **DEP-008**: **Playwright or PuppeteerSharp** - Headless browser for web scraping. Must be selected and configured in Phase 1 TASK-015.
 
@@ -283,7 +283,7 @@ The system will enable users to capture web content, automatically generate AI-p
 
 - **DEP-010**: **Serilog 4.3.0** - Structured logging framework. Required from Phase 1.
 
-- **DEP-011**: **Entity Framework Core 10.0.2** - ORM for data access. Required from Phase 1.
+- **DEP-011**: **Entity Framework Core 8.0.x** - ORM for data access. Required from Phase 1.
 
 - **DEP-012**: **MediatR 14.0.0** - CQRS pattern library. Required from Phase 1.
 
@@ -511,7 +511,7 @@ The system will enable users to capture web content, automatically generate AI-p
 
 - **ASSUMPTION-005**: **Modern Browser Support** - Assumes users will use modern browsers (Chrome, Firefox, Safari, Edge) with JavaScript enabled. Legacy browser support (IE11) is out of scope.
 
-- **ASSUMPTION-006**: **Development Environment** - Assumes developers have Docker Desktop, .NET 10.0 SDK, and sufficient local resources (8GB+ RAM) for running containerized services.
+- **ASSUMPTION-006**: **Development Environment** - Assumes developers have Docker Desktop, .NET 8.0 SDK, and sufficient local resources (8GB+ RAM) for running containerized services.
 
 - **ASSUMPTION-007**: **Network Connectivity** - Assumes reliable internet connectivity for LLM API calls and web scraping. Offline mode is out of scope.
 

@@ -19,7 +19,7 @@ This final phase hardens the system for production deployment by implementing co
 
 ## 1. Requirements & Constraints
 
-- **CON-001**: Must use .NET 10.0.2 LTS as primary framework
+- **CON-001**: Must use .NET 8.0 LTS as primary framework
 - **CON-004**: Must follow domain-driven design with clear layer separation
 - **CON-005**: Must support both self-hosted (Docker Compose) and future SaaS (K8s-ready) deployment
 - **CON-007**: All services must be containerized via Docker
@@ -66,6 +66,7 @@ This final phase hardens the system for production deployment by implementing co
 | TASK-103 | Profile application performance using dotnet-trace and identify top 5 bottlenecks | | |
 | TASK-104 | Evaluate query performance for GEM list, search, and category views; introduce Dapper for high-latency paths if needed | | |
 | TASK-124 | Conduct accessibility audit using axe DevTools and fix WCAG AA violations (NFR-005) | | |
+| TASK-TST-P11 | Implement all tests based on per Testing section in this plan. |  |  |
 
 ## 3. Alternatives
 
