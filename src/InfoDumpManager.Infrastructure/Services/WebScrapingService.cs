@@ -74,13 +74,21 @@ public sealed class WebScrapingService : IWebScrapingService
 
         try
         {
-            var response = await page.GotoAsync(
-                normalizedUrl,
-                new PageGotoOptions
-                {
-                    WaitUntil = WaitUntilState.NetworkIdle,
-                    Timeout = _options.TimeoutSeconds * 1000
-                }).ConfigureAwait(false);
+            IResponse? response;
+            try
+            {
+                response = await page.GotoAsync(
+                    normalizedUrl,
+                    new PageGotoOptions
+                    {
+                        WaitUntil = WaitUntilState.NetworkIdle,
+                        Timeout = _options.TimeoutSeconds * 1000
+                    }).ConfigureAwait(false);
+            }
+            catch (PlaywrightException ex) when (IsTimeoutException(ex))
+            {
+                throw new TimeoutException("Web scraping timed out.", ex);
+            }
 
             if (response is null)
             {
@@ -111,6 +119,14 @@ public sealed class WebScrapingService : IWebScrapingService
             await page.CloseAsync().ConfigureAwait(false);
             await context.CloseAsync().ConfigureAwait(false);
         }
+    }
+
+    private static bool IsTimeoutException(PlaywrightException exception)
+    {
+        var message = exception.Message ?? string.Empty;
+        return message.Contains("Timeout", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("ERR_NETWORK_IO_SUSPENDED", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("ERR_TIMED_OUT", StringComparison.OrdinalIgnoreCase);
     }
 }
 

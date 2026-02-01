@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\InfoDumpManager.Domain\InfoDumpManager.Domain.csproj" />
     <ProjectReference Include="..\..\src\InfoDumpManager.Application\InfoDumpManager.Application.csproj" />
     <ProjectReference Include="..\..\src\InfoDumpManager.Infrastructure\InfoDumpManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\InfoDumpManager.Web\InfoDumpManager.Web.csproj" />
   </ItemGroup>
 
 </Project>

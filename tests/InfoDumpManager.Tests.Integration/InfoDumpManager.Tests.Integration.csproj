@@ -13,6 +13,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.23" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
@@ -30,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoDumpManager.WebAPI\InfoDumpManager.WebAPI.csproj" />
     <ProjectReference Include="..\..\src\InfoDumpManager.Infrastructure\InfoDumpManager.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\InfoDumpManager.Web\InfoDumpManager.Web.csproj" />
   </ItemGroup>
 
 </Project>

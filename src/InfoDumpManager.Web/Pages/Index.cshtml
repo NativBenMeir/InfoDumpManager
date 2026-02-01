@@ -1,10 +1,39 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Submit GEM";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+@section Breadcrumbs {
+    <nav aria-label="breadcrumb" class="idm-breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-page="/Index">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Submit GEM</li>
+        </ol>
+    </nav>
+}
+
+<div class="page-header">
+    <h1 class="h2">Submit a GEM</h1>
+    <p class="text-muted">Provide a URL to capture a snapshot and add it to your GEM library.</p>
 </div>
+
+<form method="post" class="card shadow-sm p-4 gem-form">
+    <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+
+    <div class="mb-3">
+        <label asp-for="SourceUrl" class="form-label"></label>
+        <input asp-for="SourceUrl" class="form-control" placeholder="https://example.com/article" required />
+        <span asp-validation-for="SourceUrl" class="text-danger"></span>
+        <div class="form-text">We will fetch and store a snapshot for this URL.</div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary">Submit GEM</button>
+        <a class="btn btn-outline-secondary" asp-page="/GEMs/List">View GEMs</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,94 @@
+@page "{id:guid}"
+@model InfoDumpManager.Web.Pages.GEMs.DetailModel
+@{
+    ViewData["Title"] = "GEM Detail";
+}
+
+@section Breadcrumbs {
+    <nav aria-label="breadcrumb" class="idm-breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-page="/Index">Home</a></li>
+            <li class="breadcrumb-item"><a asp-page="/GEMs/List">GEMs</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Detail</li>
+        </ol>
+    </nav>
+}
+
+@if (Model.Gem is null)
+{
+    <div class="alert alert-warning" role="status">GEM not found.</div>
+}
+else
+{
+    var snapshotBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(Model.Gem.SnapshotHtml));
+    <div class="page-header">
+        <h1 class="h2">@Model.Gem.Title</h1>
+        <p class="text-muted">Captured @Model.Gem.CreatedAt.ToLocalTime().ToString("f")</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="status">@Model.StatusMessage</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5">Snapshot Preview</h2>
+                    <p class="text-muted">Source: <a href="@Model.Gem.SourceUrl" target="_blank" rel="noopener">@Model.Gem.SourceUrl</a></p>
+                    <iframe class="snapshot-frame" title="Snapshot preview" sandbox="allow-same-origin" data-snapshot="@snapshotBase64"></iframe>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">Summary</h2>
+                    @if (string.IsNullOrWhiteSpace(Model.Gem.SummaryText))
+                    {
+                        <p class="text-muted">No summary available yet.</p>
+                    }
+                    else
+                    {
+                        <p>@Model.Gem.SummaryText</p>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5">Details</h2>
+                    <dl class="row mb-0">
+                        <dt class="col-5">Category</dt>
+                        <dd class="col-7">@(Model.Gem.CategoryName ?? "Unassigned")</dd>
+                        <dt class="col-5">URL</dt>
+                        <dd class="col-7"><a href="@Model.Gem.Url" target="_blank" rel="noopener">Open</a></dd>
+                        <dt class="col-5">Captured</dt>
+                        <dd class="col-7">@Model.Gem.SnapshotCapturedAt.ToLocalTime().ToString("g")</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">Assign Category</h2>
+                    <form method="post" asp-page-handler="AssignCategory">
+                        <div class="mb-3">
+                            <label class="form-label" for="categorySelect">Category</label>
+                            <select id="categorySelect" class="form-select" asp-for="SelectedCategoryId">
+                                <option value="">Select a category</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="SelectedCategoryId" class="text-danger"></span>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Save Category</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
