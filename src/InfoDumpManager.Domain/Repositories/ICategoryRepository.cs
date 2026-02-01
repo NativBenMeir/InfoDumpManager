@@ -13,4 +13,5 @@ public interface ICategoryRepository
     Task<Category?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Category>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<bool> ExistsByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task RemoveAsync(Category category, CancellationToken cancellationToken = default);
 }

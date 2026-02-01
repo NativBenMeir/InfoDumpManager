@@ -1,0 +1,28 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  InfoDumpManager.Domain -> C:\Code\InfoDumpManager\src\InfoDumpManager.Domain\bin\Debug\net8.0\InfoDumpManager.Domain.dll
+  InfoDumpManager.Application -> C:\Code\InfoDumpManager\src\InfoDumpManager.Application\bin\Debug\net8.0\InfoDumpManager.Application.dll
+  InfoDumpManager.Infrastructure -> C:\Code\InfoDumpManager\src\InfoDumpManager.Infrastructure\bin\Debug\net8.0\InfoDumpManager.Infrastructure.dll
+  InfoDumpManager.WebAPI -> C:\Code\InfoDumpManager\src\InfoDumpManager.WebAPI\bin\Debug\net8.0\InfoDumpManager.WebAPI.dll
+  InfoDumpManager.Tests.Integration -> C:\Code\InfoDumpManager\tests\InfoDumpManager.Tests.Integration\bin\Debug\net8.0\InfoDumpManager.Tests.Integration.dll
+Test run for C:\Code\InfoDumpManager\tests\InfoDumpManager.Tests.Integration\bin\Debug\net8.0\InfoDumpManager.Tests.Integration.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:06.21]     InfoDumpManager.Tests.Integration.ApiIntegrationTests.TEST_024_CreateGemWithToken_ReturnsCreated [FAIL]
+  Failed InfoDumpManager.Tests.Integration.ApiIntegrationTests.TEST_024_CreateGemWithToken_ReturnsCreated [853 ms]
+  Error Message:
+   Expected response.StatusCode to be HttpStatusCode.Created {value: 201}, but found HttpStatusCode.Unauthorized {value: 401}.
+  Stack Trace:
+     at FluentAssertions.Execution.LateBoundTestFramework.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.AddPreFormattedFailure(String formattedFailureMessage)
+   at FluentAssertions.Execution.AssertionChain.FailWith(Func`1 getFailureReason)
+   at FluentAssertions.Execution.AssertionChain.FailWith(Func`1 getFailureReason)
+   at FluentAssertions.Execution.AssertionChain.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.EnumAssertions`2.Be(TEnum expected, String because, Object[] becauseArgs)
+   at InfoDumpManager.Tests.Integration.ApiIntegrationTests.TEST_024_CreateGemWithToken_ReturnsCreated() in C:\Code\InfoDumpManager\tests\InfoDumpManager.Tests.Integration\ApiIntegrationTests.cs:line 103
+--- End of stack trace from previous location ---
+
+Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1, Duration: < 1 ms - InfoDumpManager.Tests.Integration.dll (net8.0)

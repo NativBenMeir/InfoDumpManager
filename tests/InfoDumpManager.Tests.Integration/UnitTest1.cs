@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using InfoDumpManager.WebAPI;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Serilog;
 using Xunit;

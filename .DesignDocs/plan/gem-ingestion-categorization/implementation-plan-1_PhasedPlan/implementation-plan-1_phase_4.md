@@ -7,13 +7,13 @@ date_created: 2026-01-28
 last_updated: 2026-01-28
 tags: [authentication, api, security, jwt, aspnetcore]
 depends_on: [1, 2, 3]
-status: Planned
-status_color: blue
+status: Complete
+status_color: green
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/Status-Planned-blue)
+![Status: Complete](https://img.shields.io/badge/Status-Complete-brightgreen)
 
 This phase implements authentication and authorization infrastructure using ASP.NET Core Identity with JWT bearer tokens. It creates the foundational API controllers for GEMs and Categories, implements MediatR command/query handlers following CQRS-lite pattern, and establishes FluentValidation for input validation. The phase also sets up error handling middleware and comprehensive API documentation with Swagger.
 
@@ -56,15 +56,19 @@ This phase implements authentication and authorization infrastructure using ASP.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-011 | Set up ASP.NET Core Identity with user registration and login endpoints | | |
-| TASK-012 | Implement JWT bearer token authentication for API access | | |
-| TASK-013 | Create GEM API Controller with endpoints: POST /api/v1/gems (create), GET /api/v1/gems/{id}, GET /api/v1/gems (list with pagination) | | |
-| TASK-014 | Create Category API Controller with endpoints: POST /api/v1/categories, GET /api/v1/categories, PUT /api/v1/categories/{id}, DELETE /api/v1/categories/{id} | | |
-| TASK-017 | Create MediatR 14.0.0 command handlers: CreateGEMCommand, AssignCategoryCommand, CreateCategoryCommand | | |
-| TASK-018 | Implement FluentValidation 12.1.1 validators for all commands and DTOs | | |
-| TASK-028 | Implement basic error handling middleware with structured error responses | | |
-| TASK-038-P4 | Configure claims-based authorization policies for multi-tenancy support | | |
-| TASK-TST-P4 | Implement all tests based on per Testing section in this plan. |  |  |
+| TASK-011 | Set up ASP.NET Core Identity with user registration and login endpoints | ✅ | 2026-01-30 |
+| TASK-012 | Implement JWT bearer token authentication for API access | ✅ | 2026-01-30 |
+| TASK-013 | Create GEM API Controller with endpoints: POST /api/v1/gems (create), GET /api/v1/gems/{id}, GET /api/v1/gems (list with pagination) | ✅ | 2026-01-30 |
+| TASK-014 | Create Category API Controller with endpoints: POST /api/v1/categories, GET /api/v1/categories, PUT /api/v1/categories/{id}, DELETE /api/v1/categories/{id} | ✅ | 2026-01-30 |
+| TASK-017 | Create MediatR 14.0.0 command handlers: CreateGEMCommand, AssignCategoryCommand, CreateCategoryCommand | ✅ | 2026-01-30 |
+| TASK-018 | Implement FluentValidation 12.1.1 validators for all commands and DTOs | ✅ | 2026-01-30 |
+| TASK-028 | Implement basic error handling middleware with structured error responses | ✅ | 2026-01-30 |
+| TASK-038-P4 | Configure claims-based authorization policies for multi-tenancy support | ✅ | 2026-01-30 |
+| TASK-TST-P4 | Implement all tests based on per Testing section in this plan. | ✅ | 2026-01-30 |
+| TASK-AUT | Implement all unit tests based on Testing section in this plan | ✅ | 2026-01-30 |
+| TASK-AIT | Implement all integration tests based on Testing section in this plan | ✅ | 2026-01-30 |
+
+All tasks under Phase 4 are complete. Validator coverage now includes `CreateCategoryCommand` and `AssignCategoryCommand`, and the integration suite exercises the GEM list, assign-category, category list/update/delete flows plus invalid-token handling to satisfy the testing requirements.
 
 ## 3. Alternatives
 

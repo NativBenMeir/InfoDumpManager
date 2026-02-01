@@ -60,4 +60,10 @@ public sealed class CategoryRepository : ICategoryRepository
     {
         return _context.Categories.AnyAsync(x => x.TenantId == tenantId && x.Name == name, cancellationToken);
     }
+
+    public Task RemoveAsync(Category category, CancellationToken cancellationToken = default)
+    {
+        _context.Categories.Remove(category);
+        return Task.CompletedTask;
+    }
 }
