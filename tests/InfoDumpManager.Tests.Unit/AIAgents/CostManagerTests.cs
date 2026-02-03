@@ -1,0 +1,155 @@
+using System.Diagnostics.CodeAnalysis;
+using InfoDumpManager.Application.Services.CostManagement;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
+using Xunit;
+
+namespace InfoDumpManager.Tests.Unit.AIAgents;
+
+[ExcludeFromCodeCoverage]
+public sealed class CostManagerTests
+{
+    private readonly Mock<ICostUsageRepository> _mockRepository;
+    private readonly Mock<IOptions<CostManagementOptions>> _mockOptions;
+    private readonly Mock<ILogger<CostManagerImpl>> _mockLogger;
+    private readonly CostManagerImpl _costManager;
+
+    public CostManagerTests()
+    {
+        _mockRepository = new Mock<ICostUsageRepository>();
+        _mockOptions = new Mock<IOptions<CostManagementOptions>>();
+        _mockOptions.Setup(x => x.Value).Returns(new CostManagementOptions
+        {
+            MonthlyBudgetUsd = 100m,
+            DefaultCostPer1KTokensUsd = 0.01m
+        });
+        _mockLogger = new Mock<ILogger<CostManagerImpl>>();
+        _costManager = new CostManagerImpl(_mockRepository.Object, _mockOptions.Object, _mockLogger.Object);
+    }
+
+    [Fact]
+    public async Task CanProcessAsync_WithBudgetUnderLimit_ShouldAllow()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var estimatedTokens = 100;
+
+        _mockRepository
+            .Setup(x => x.GetTotalCostAsync(tenantId, It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(50m); // Current usage $50
+
+        // Act
+        var result = await _costManager.CanProcessAsync(tenantId, estimatedTokens, "test-operation");
+
+        // Assert
+        Assert.True(result.Allowed);
+        Assert.Contains("allowed", result.Message.ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task CanProcessAsync_WithBudgetOverLimit_ShouldDeny()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var estimatedTokens = 1000000; // Very high token count
+
+        _mockRepository
+            .Setup(x => x.GetTotalCostAsync(tenantId, It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(950m); // Current usage $950, assuming $1000 limit
+
+        // Act
+        var result = await _costManager.CanProcessAsync(tenantId, estimatedTokens, "test-operation");
+
+        // Assert
+        Assert.False(result.Allowed);
+        Assert.Contains("budget", result.Message.ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task RecordUsageAsync_ShouldPersistUsageData()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var gemId = Guid.NewGuid();
+        var tokensUsed = 150;
+        var cost = 0.003m;
+
+        // Act
+        await _costManager.RecordUsageAsync(tenantId, gemId, "summarization", tokensUsed, cost);
+
+        // Assert
+        _mockRepository.Verify(
+            x => x.AddAsync(
+                It.Is<CostUsageRecord>(r => r.TenantId == tenantId
+                                            && r.GEMId == gemId
+                                            && r.Operation == "summarization"
+                                            && r.TokensUsed == tokensUsed
+                                            && r.Cost == cost),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RecordUsageAsync_ShouldUpdateTotalCorrectly()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var gemId = Guid.NewGuid();
+
+        // Act
+        await _costManager.RecordUsageAsync(tenantId, gemId, "operation1", 100, 0.001m);
+        await _costManager.RecordUsageAsync(tenantId, gemId, "operation2", 200, 0.002m);
+
+        // Assert
+        _mockRepository.Verify(
+            x => x.AddAsync(It.IsAny<CostUsageRecord>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task CanProcessAsync_WithConcurrentRequests_ShouldHandleCorrectly()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var estimatedTokens = 100;
+
+        _mockRepository
+            .Setup(x => x.GetTotalCostAsync(tenantId, It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(100m);
+
+        // Act
+        var tasks = Enumerable.Range(0, 10)
+            .Select(_ => _costManager.CanProcessAsync(tenantId, estimatedTokens, "concurrent-op"))
+            .ToList();
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.All(results, r => Assert.NotNull(r));
+    }
+
+    [Fact]
+    public async Task CanProcessAsync_ShouldEnforcPerTenantBudgetIsolation()
+    {
+        // Arrange
+        var tenant1 = Guid.NewGuid();
+        var tenant2 = Guid.NewGuid();
+
+        _mockRepository
+            .Setup(x => x.GetTotalCostAsync(tenant1, It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(900m); // Tenant 1 near limit
+
+        _mockRepository
+            .Setup(x => x.GetTotalCostAsync(tenant2, It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(50m); // Tenant 2 well under limit
+
+        // Act
+        var result1 = await _costManager.CanProcessAsync(tenant1, 10000, "operation");
+        var result2 = await _costManager.CanProcessAsync(tenant2, 100, "operation");
+
+        // Assert
+        Assert.False(result1.Allowed); // Tenant 1 denied
+        Assert.True(result2.Allowed);  // Tenant 2 allowed
+    }
+}

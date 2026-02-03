@@ -5,12 +5,22 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 using InfoDumpManager.Application;
+using InfoDumpManager.Application.Agents;
+using InfoDumpManager.Application.Agents.Implementations;
+using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Common.Services;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
+using InfoDumpManager.Application.Services;
+using InfoDumpManager.Application.Services.CostManagement;
+using InfoDumpManager.Application.Services.Embeddings;
+using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Application.Validators;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Infrastructure.Data;
 using InfoDumpManager.Infrastructure.Repositories;
+using InfoDumpManager.Infrastructure.Services.Embeddings;
+using InfoDumpManager.Infrastructure.Services.LLM;
 using InfoDumpManager.Infrastructure.Services;
 using InfoDumpManager.WebAPI.Middleware;
 using InfoDumpManager.WebAPI.Options;
@@ -33,8 +43,10 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.OpenApi.Models;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.SemanticKernel;
 using Polly;
 using Serilog;
+using StackExchange.Redis;
 
 namespace InfoDumpManager.WebAPI;
 
@@ -134,7 +146,10 @@ public class Program
         }
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(connectionString, sql => sql.EnableRetryOnFailure()));
+            options.UseNpgsql(connectionString, sql => {
+                sql.EnableRetryOnFailure();
+                sql.UseVector();
+            }));
 
         services.AddIdentity<User, IdentityRole<Guid>>(options =>
             {
@@ -202,10 +217,35 @@ public class Program
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IGEMRepository, GEMRepository>();
+        services.AddScoped<ICostUsageRepository, CostUsageRepository>();
+        services.AddScoped<ICostManager, CostManagerImpl>();
+        services.Configure<CostManagementOptions>(configuration.GetSection("CostManagement"));
         services.Configure<MinioOptions>(configuration.GetSection("Minio"));
         services.Configure<WebScrapingOptions>(configuration.GetSection("WebScraping"));
         services.AddScoped<IStorageService, MinioStorageService>();
         services.AddScoped<IWebScrapingService, WebScrapingService>();
+
+        services.AddSingleton<IJobQueue<ProcessingJob>, InMemoryJobQueue<ProcessingJob>>();
+        services.AddSingleton<IContentProcessingOrchestrator, ContentProcessingOrchestrator>();
+        services.AddHostedService<ContentProcessingBackgroundService>();
+
+        services.AddScoped<IAgent, SummarizationAgent>();
+        services.AddScoped<IAgent, CategorizationAgent>();
+        services.AddScoped<IAgent, TaggingAgent>();
+        services.AddScoped<IAgent, ValidationAgent>();
+
+        services.AddSingleton<Kernel>(_ => Kernel.CreateBuilder().Build());
+        services.AddSingleton<ILLMProvider, SemanticKernelProvider>();
+        services.AddScoped<IEmbeddingProvider, DeterministicEmbeddingProvider>();
+        services.AddScoped<IVectorStore, PostgreSqlVectorStore>();
+        services.AddSingleton<IEmbeddingCache, RedisEmbeddingCache>();
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var redisConfiguration = configuration.GetConnectionString("Redis")
+                ?? configuration["Redis:Configuration"]
+                ?? "localhost:6379";
+            return ConnectionMultiplexer.Connect(redisConfiguration);
+        });
 
         var retryPolicy = Policy.Handle<Exception>().WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
         var breakerPolicy = Policy.Handle<Exception>().CircuitBreakerAsync(2, TimeSpan.FromSeconds(30));
