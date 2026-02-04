@@ -113,7 +113,8 @@ public sealed class OrchestratorCircuitBreakerTests
         // Act - Multiple consecutive failures
         for (int i = 0; i < 5; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var metadata = new AgentContextMetadata("test", 100, DateTimeOffset.UtcNow, new Dictionary<string, object>());
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", metadata);
             var result = await mockAgent.Object.ExecuteAsync(context);
             Assert.False(result.Success);
         }
@@ -151,11 +152,13 @@ public sealed class OrchestratorCircuitBreakerTests
         // Act & Assert - First 3 calls should work, 4th should throw
         for (int i = 0; i < 3; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var metadata = new AgentContextMetadata("test", 100, DateTimeOffset.UtcNow, new Dictionary<string, object>());
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", metadata);
             await mockAgent.Object.ExecuteAsync(context);
         }
 
-        var finalContext = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+        var finalMetadata = new AgentContextMetadata("test", 100, DateTimeOffset.UtcNow, new Dictionary<string, object>());
+        var finalContext = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", finalMetadata);
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await mockAgent.Object.ExecuteAsync(finalContext));
     }
@@ -184,7 +187,8 @@ public sealed class OrchestratorCircuitBreakerTests
         var results = new List<bool>();
         for (int i = 0; i < 9; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var metadata = new AgentContextMetadata("test", 100, DateTimeOffset.UtcNow, new Dictionary<string, object>());
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", metadata);
             var result = await mockAgent.Object.ExecuteAsync(context);
             results.Add(result.Success);
         }
