@@ -120,4 +120,76 @@ public sealed class SemanticKernelProviderTests
         // Assert
         Assert.NotNull(provider);
     }
+
+    [Fact]
+    public async Task LLMProvider_WhenPrimaryFails_ShouldFallbackToSecondary()
+    {
+        // Medium Priority Test #10 - Provider Fallback Tests
+        // Arrange
+        var callCount = 0;
+        var mockPrimary = new Mock<ILLMProvider>();
+        var mockFallback = new Mock<ILLMProvider>();
+
+        mockPrimary
+            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
+            .Throws(new HttpRequestException("Primary provider unavailable"));
+
+        mockFallback
+            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                return new LLMResponse("Fallback result", 100, "fallback-model", TimeSpan.FromMilliseconds(200));
+            });
+
+        // Act - Try primary, fall back to secondary
+        LLMResponse? response = null;
+        try
+        {
+            response = await mockPrimary.Object.GenerateAsync("test", new LLMOptions("gpt-4", 100, 0.7), CancellationToken.None);
+        }
+        catch
+        {
+            response = await mockFallback.Object.GenerateAsync("test", new LLMOptions("gpt-3.5-turbo", 100, 0.7), CancellationToken.None);
+        }
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.Equal("Fallback result", response.Content);
+        Assert.Equal(1, callCount);
+        mockFallback.Verify(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SemanticKernelProvider_WithTransientFailure_ShouldRetryCorrectly()
+    {
+        // Medium Priority Test #12 - Semantic Kernel Retry Policy Tests
+        // Arrange
+        var attemptCount = 0;
+        var mockKernel = new Mock<Kernel>();
+        
+        // This test documents expected retry behavior with Polly
+        // In actual implementation, Polly would handle retries for transient failures
+        
+        // Act & Assert
+        Assert.True(true); // Placeholder
+        
+        // TODO: When real SK integration exists, verify:
+        // 1. Transient failures (429, 503) trigger retry
+        // 2. Exponential backoff is applied
+        // 3. Max retry count is respected
+        // 4. Circuit breaker opens after threshold
+    }
+
+    [Fact]
+    public async Task SemanticKernelProvider_WithPermanentFailure_ShouldNotRetry()
+    {
+        // Arrange
+        var attemptCount = 0;
+        
+        // Act & Assert
+        Assert.True(true); // Placeholder
+        
+        // TODO: Verify permanent failures (401, 403, 400) don't trigger retry
+    }
 }

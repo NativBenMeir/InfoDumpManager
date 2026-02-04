@@ -27,7 +27,6 @@ public sealed class CostTrackingIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _dbContext.Database.EnsureDeletedAsync();
         await _dbContext.DisposeAsync();
     }
 

@@ -79,7 +79,7 @@ public sealed class AiProcessingController : ControllerBase
             Status = ProcessingStatus.Pending
         };
 
-        return AcceptedAtAction(nameof(GetJobStatusAsync), new { jobId }, response);
+        return AcceptedAtAction("GetJobStatus", new { jobId }, response);
     }
 
     [HttpGet("jobs/{jobId:guid}")]

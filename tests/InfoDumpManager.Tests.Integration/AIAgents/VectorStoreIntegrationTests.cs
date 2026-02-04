@@ -206,6 +206,50 @@ public sealed class PostgreSqlVectorStoreIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task VectorStore_SearchByTenant_ShouldNeverReturnOtherTenantsData()
+    {
+        // High Priority Test #8 - Enhanced multi-tenant data isolation with adversarial scenarios
+        // Arrange
+        var tenant1 = Guid.NewGuid();
+        var tenant2 = Guid.NewGuid();
+        var tenant3 = Guid.NewGuid();
+        var identicalVector = BuildVector(0.5f, 0.5f, 0.5f);
+
+        // Store identical vectors for different tenants
+        await _vectorStore.StoreAsync(new EmbeddingRecord(
+            Guid.NewGuid(), tenant1, Guid.NewGuid(), "sensitive", "text-embedding-3-large", identicalVector, 
+            "{\"classification\":\"tenant1-secret\"}", DateTimeOffset.UtcNow));
+
+        await _vectorStore.StoreAsync(new EmbeddingRecord(
+            Guid.NewGuid(), tenant2, Guid.NewGuid(), "sensitive", "text-embedding-3-large", identicalVector, 
+            "{\"classification\":\"tenant2-secret\"}", DateTimeOffset.UtcNow));
+
+        await _vectorStore.StoreAsync(new EmbeddingRecord(
+            Guid.NewGuid(), tenant3, Guid.NewGuid(), "sensitive", "text-embedding-3-large", identicalVector, 
+            "{\"classification\":\"tenant3-secret\"}", DateTimeOffset.UtcNow));
+
+        await _dbContext.SaveChangesAsync();
+
+        // Act - Search as tenant1
+        var request = new EmbeddingSearchRequest(tenant1, "sensitive", identicalVector, 100);
+        var results = await _vectorStore.SearchSimilarAsync(request);
+
+        // Assert - Should ONLY see tenant1's data, never tenant2 or tenant3
+        Assert.NotEmpty(results);
+        Assert.All(results, r =>
+        {
+            var record = _dbContext.EmbeddingRecords.FirstOrDefault(x => x.SourceId == r.SourceId);
+            Assert.NotNull(record);
+            Assert.Equal(tenant1, record.TenantId);
+            Assert.DoesNotContain("tenant2", record.MetadataJson ?? string.Empty);
+            Assert.DoesNotContain("tenant3", record.MetadataJson ?? string.Empty);
+        });
+
+        // Verify count matches expected (should be exactly 1 for tenant1)
+        Assert.Single(results);
+    }
+
+    [Fact]
     public async Task SearchAsync_WithEmptyVector_ShouldThrowArgumentException()
     {
         // Arrange
@@ -247,6 +291,112 @@ public sealed class PostgreSqlVectorStoreIntegrationTests : IAsyncLifetime
             .CountAsync(e => e.TenantId == tenantId && e.ContentType == "concurrent");
 
         Assert.Equal(10, count);
+    }
+
+    [Fact]
+    public async Task VectorStore_WithDifferentModelDimensions_ShouldHandleGracefully()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        
+        // Store record with current model (1536 dimensions)
+        var record1536 = new EmbeddingRecord(
+            Guid.NewGuid(),
+            tenantId,
+            Guid.NewGuid(),
+            "test",
+            "text-embedding-3-large",
+            BuildVector(0.1f, 0.2f, 0.3f),
+            "{\"modelVersion\":\"1536\"}",
+            DateTimeOffset.UtcNow);
+
+        await _vectorStore.StoreAsync(record1536);
+        await _dbContext.SaveChangesAsync();
+
+        // Act - Search should work with same dimensions
+        var searchVector = BuildVector(0.1f, 0.2f, 0.3f);
+        var request = new EmbeddingSearchRequest(tenantId, "test", searchVector, 10);
+        var results = await _vectorStore.SearchSimilarAsync(request);
+
+        // Assert
+        Assert.NotEmpty(results);
+        var firstResult = results.First();
+        Assert.Equal(record1536.SourceId, firstResult.SourceId);
+    }
+
+    [Fact]
+    public async Task VectorStore_WithModelMigration_ShouldCoexist()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        
+        // Store records with metadata indicating model version
+        var oldModelRecord = new EmbeddingRecord(
+            Guid.NewGuid(),
+            tenantId,
+            Guid.NewGuid(),
+            "category",
+            "text-embedding-ada-002",
+            BuildVector(0.5f),
+            "{\"modelVersion\":\"ada-002\",\"dimension\":1536}",
+            DateTimeOffset.UtcNow.AddDays(-30)); // Older record
+
+        var newModelRecord = new EmbeddingRecord(
+            Guid.NewGuid(),
+            tenantId,
+            Guid.NewGuid(),
+            "category",
+            "text-embedding-3-large",
+            BuildVector(0.5f),
+            "{\"modelVersion\":\"3-large\",\"dimension\":1536}",
+            DateTimeOffset.UtcNow); // Newer record
+
+        await _vectorStore.StoreAsync(oldModelRecord);
+        await _vectorStore.StoreAsync(newModelRecord);
+        await _dbContext.SaveChangesAsync();
+
+        // Act - Search should return both
+        var request = new EmbeddingSearchRequest(tenantId, "category", BuildVector(0.5f), 10);
+        var results = await _vectorStore.SearchSimilarAsync(request);
+
+        // Assert - Both records should be searchable
+        Assert.Equal(2, results.Count());
+        
+        // Can verify model versions via metadata if needed
+        var oldRecord = _dbContext.EmbeddingRecords.First(e => e.SourceId == oldModelRecord.SourceId);
+        var newRecord = _dbContext.EmbeddingRecords.First(e => e.SourceId == newModelRecord.SourceId);
+        
+        Assert.Contains("ada-002", oldRecord.MetadataJson ?? string.Empty);
+        Assert.Contains("3-large", newRecord.MetadataJson ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task VectorStore_WithZeroVector_ShouldStore()
+    {
+        // Arrange - Edge case: zero vector (all zeros)
+        var tenantId = Guid.NewGuid();
+        var zeroVector = new float[VectorSize]; // All zeros by default
+        
+        var record = new EmbeddingRecord(
+            Guid.NewGuid(),
+            tenantId,
+            Guid.NewGuid(),
+            "edge-case",
+            "text-embedding-3-large",
+            zeroVector,
+            "{\"note\":\"zero-vector\"}",
+            DateTimeOffset.UtcNow);
+
+        // Act
+        await _vectorStore.StoreAsync(record);
+        await _dbContext.SaveChangesAsync();
+
+        // Assert
+        var stored = await _dbContext.EmbeddingRecords
+            .FirstOrDefaultAsync(e => e.SourceId == record.SourceId);
+        
+        Assert.NotNull(stored);
+        Assert.Equal(VectorSize, stored.Vector.Length);
     }
 
     private static float[] BuildVector(params float[] values)

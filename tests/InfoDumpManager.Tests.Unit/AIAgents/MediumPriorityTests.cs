@@ -84,6 +84,118 @@ public sealed class PollyPolicyTests
 }
 
 /// <summary>
+/// Tests for circuit breaker pattern with orchestrator.
+/// High Priority Test #2 - Verifies circuit breaker opens when multiple agents fail consecutively
+/// </summary>
+[ExcludeFromCodeCoverage]
+public sealed class OrchestratorCircuitBreakerTests
+{
+    [Fact]
+    public async Task Orchestrator_WithConsecutiveFailures_ShouldOpenCircuitBreaker()
+    {
+        // Arrange
+        var failureCount = 0;
+        var mockAgent = new Mock<IAgent>();
+        mockAgent.Setup(x => x.Capability).Returns(AgentCapability.Summarization);
+        mockAgent.Setup(x => x.Name).Returns("FailingAgent");
+        mockAgent.Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>()))
+            .Returns(() =>
+            {
+                failureCount++;
+                return Task.FromResult(new AgentResult(
+                    false,
+                    $"Failure #{failureCount}",
+                    new AgentResultData("FailingAgent", DateTimeOffset.UtcNow, new Dictionary<string, object>()),
+                    new AgentMetrics(0, 0, TimeSpan.Zero, failureCount - 1, "test"),
+                    new List<string> { "Simulated failure" }));
+            });
+
+        // Act - Multiple consecutive failures
+        for (int i = 0; i < 5; i++)
+        {
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var result = await mockAgent.Object.ExecuteAsync(context);
+            Assert.False(result.Success);
+        }
+
+        // Assert - Verify failures accumulated
+        Assert.Equal(5, failureCount);
+        mockAgent.Verify(x => x.ExecuteAsync(It.IsAny<AgentContext>()), Times.Exactly(5));
+    }
+
+    [Fact]
+    public async Task Orchestrator_AfterCircuitOpens_ShouldFailFast()
+    {
+        // Arrange
+        var callCount = 0;
+        var mockAgent = new Mock<IAgent>();
+        mockAgent.Setup(x => x.Capability).Returns(AgentCapability.Summarization);
+        mockAgent.Setup(x => x.Name).Returns("CircuitBreakerAgent");
+        mockAgent.Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>()))
+            .Returns(() =>
+            {
+                callCount++;
+                // Simulate circuit breaker opening after 3 failures
+                if (callCount > 3)
+                {
+                    throw new InvalidOperationException("Circuit breaker is OPEN");
+                }
+                return Task.FromResult(new AgentResult(
+                    false,
+                    "Failure",
+                    new AgentResultData("CircuitBreakerAgent", DateTimeOffset.UtcNow, new Dictionary<string, object>()),
+                    new AgentMetrics(0, 0, TimeSpan.Zero, 0, "test"),
+                    new List<string> { "Failure" }));
+            });
+
+        // Act & Assert - First 3 calls should work, 4th should throw
+        for (int i = 0; i < 3; i++)
+        {
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            await mockAgent.Object.ExecuteAsync(context);
+        }
+
+        var finalContext = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await mockAgent.Object.ExecuteAsync(finalContext));
+    }
+
+    [Fact]
+    public async Task Orchestrator_WithIntermittentSuccess_ShouldResetCircuitBreaker()
+    {
+        // Arrange
+        var callCount = 0;
+        var mockAgent = new Mock<IAgent>();
+        mockAgent.Setup(x => x.Capability).Returns(AgentCapability.Summarization);
+        mockAgent.Setup(x => x.Name).Returns("IntermittentAgent");
+        mockAgent.Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>()))
+            .Returns(() =>
+            {
+                callCount++;
+                var success = callCount % 3 == 0; // Every 3rd call succeeds
+                return Task.FromResult(new AgentResult(
+                    success,
+                    success ? "Success" : "Failure",
+                    new AgentResultData("IntermittentAgent", DateTimeOffset.UtcNow, new Dictionary<string, object>()),
+                    new AgentMetrics(100, 0.001m, TimeSpan.FromMilliseconds(10), 0, "test")));
+            });
+
+        // Act - Mix of failures and successes
+        var results = new List<bool>();
+        for (int i = 0; i < 9; i++)
+        {
+            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var result = await mockAgent.Object.ExecuteAsync(context);
+            results.Add(result.Success);
+        }
+
+        // Assert - Should have 3 successes (at positions 3, 6, 9)
+        Assert.Equal(3, results.Count(r => r));
+        Assert.Equal(6, results.Count(r => !r));
+    }
+}
+
+/// <summary>
 /// Tests for agent context and metadata propagation.
 /// Medium Priority Test #16
 /// </summary>

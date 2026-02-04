@@ -31,7 +31,6 @@ public sealed class AIAgentsPipelineIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _dbContext.Database.EnsureDeletedAsync();
         await _dbContext.DisposeAsync();
     }
 
