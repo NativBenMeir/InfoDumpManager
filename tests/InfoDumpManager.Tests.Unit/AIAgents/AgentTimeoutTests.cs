@@ -38,7 +38,7 @@ public sealed class AgentTimeoutTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
@@ -66,7 +66,7 @@ public sealed class AgentTimeoutTests
         cts.Cancel(); // Cancel immediately
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
 
         Assert.Equal(0, callCount); // Provider should not be called
@@ -101,7 +101,7 @@ public sealed class AgentTimeoutTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
@@ -159,7 +159,7 @@ public sealed class AgentTimeoutTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
