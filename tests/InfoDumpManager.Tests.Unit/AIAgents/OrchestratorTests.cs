@@ -226,10 +226,10 @@ public sealed class ContentProcessingOrchestratorTests
         // Arrange
         var agents = new List<IAgent>
         {
-            CreateMockAgentWithMetrics(AgentCapability.Summarization, "Agent1", 100, 0.002m, 500),
-            CreateMockAgentWithMetrics(AgentCapability.Categorization, "Agent2", 50, 0.001m, 300),
-            CreateMockAgentWithMetrics(AgentCapability.Tagging, "Agent3", 75, 0.0015m, 400)
-        }.Select(m => m.Object).ToList();
+            CreateMockAgentWithMetrics(AgentCapability.Summarization, "Agent1", 100, 0.002m, 500).Object,
+            CreateMockAgentWithMetrics(AgentCapability.Categorization, "Agent2", 50, 0.001m, 300).Object,
+            CreateMockAgentWithMetrics(AgentCapability.Tagging, "Agent3", 75, 0.0015m, 400).Object
+        };
 
         var orchestrator = CreateOrchestrator(agents);
         var options = new ProcessingOptions();
