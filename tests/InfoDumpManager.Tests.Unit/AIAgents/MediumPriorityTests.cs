@@ -113,7 +113,7 @@ public sealed class OrchestratorCircuitBreakerTests
         // Act - Multiple consecutive failures
         for (int i = 0; i < 5; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var context = CreateContext("test");
             var result = await mockAgent.Object.ExecuteAsync(context);
             Assert.False(result.Success);
         }
@@ -151,11 +151,11 @@ public sealed class OrchestratorCircuitBreakerTests
         // Act & Assert - First 3 calls should work, 4th should throw
         for (int i = 0; i < 3; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var context = CreateContext("test");
             await mockAgent.Object.ExecuteAsync(context);
         }
 
-        var finalContext = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+        var finalContext = CreateContext("test");
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await mockAgent.Object.ExecuteAsync(finalContext));
     }
@@ -184,7 +184,7 @@ public sealed class OrchestratorCircuitBreakerTests
         var results = new List<bool>();
         for (int i = 0; i < 9; i++)
         {
-            var context = new AgentContext(Guid.NewGuid(), Guid.NewGuid(), "test", new Dictionary<string, object>());
+            var context = CreateContext("test");
             var result = await mockAgent.Object.ExecuteAsync(context);
             results.Add(result.Success);
         }
@@ -192,6 +192,19 @@ public sealed class OrchestratorCircuitBreakerTests
         // Assert - Should have 3 successes (at positions 3, 6, 9)
         Assert.Equal(3, results.Count(r => r));
         Assert.Equal(6, results.Count(r => !r));
+    }
+
+    private static AgentContext CreateContext(string contentText)
+    {
+        return new AgentContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            contentText,
+            new AgentContextMetadata(
+                "test",
+                25,
+                DateTimeOffset.UtcNow,
+                new Dictionary<string, object>()));
     }
 }
 
@@ -244,14 +257,14 @@ public sealed class AgentContextPropagationTests
 public sealed class ConcurrentProcessingTests
 {
     [Fact]
-    public async Task ConcurrentAgentCalls_ShouldBeThreadSafe()
+    public void ConcurrentAgentCalls_ShouldBeThreadSafe()
     {
         // Test multiple concurrent agent executions
         Assert.True(true); // Placeholder
     }
 
     [Fact]
-    public async Task JobQueue_ShouldHandleConcurrentEnqueue()
+    public void JobQueue_ShouldHandleConcurrentEnqueue()
     {
         // Test concurrent enqueue operations
         Assert.True(true); // Placeholder
@@ -266,21 +279,21 @@ public sealed class ConcurrentProcessingTests
 public sealed class ErrorRecoveryTests
 {
     [Fact]
-    public async Task TransientFailure_ShouldRecoverWithRetry()
+    public void TransientFailure_ShouldRecoverWithRetry()
     {
         // Test retry recovers from transient failures
         Assert.True(true); // Placeholder
     }
 
     [Fact]
-    public async Task PermanentFailure_ShouldFailGracefully()
+    public void PermanentFailure_ShouldFailGracefully()
     {
         // Test permanent failures handled properly
         Assert.True(true); // Placeholder
     }
 
     [Fact]
-    public async Task PartialAgentFailure_ShouldNotBlockPipeline()
+    public void PartialAgentFailure_ShouldNotBlockPipeline()
     {
         // Test pipeline continues when optional agents fail
         Assert.True(true); // Placeholder

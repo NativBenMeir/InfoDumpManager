@@ -12,6 +12,7 @@ using InfoDumpManager.Infrastructure.Data.Entities;
 using InfoDumpManager.Infrastructure.Repositories;
 using InfoDumpManager.Infrastructure.Services.Embeddings;
 using InfoDumpManager.Tests.Integration.Fixtures;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -122,6 +123,11 @@ public sealed class AIAgentsProcessingIntegrationTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddScoped<ApplicationDbContext>(_ => _fixture.CreateContext());
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(x => x.Publish(It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        services.AddScoped<IMediator>(_ => mediator.Object);
         services.AddScoped<IAgent>(_ => new TestAgent(AgentCapability.Summarization, "Summary", payload =>
         {
             payload["summaryObject"] = GEMSummary.Create("AI summary", "test-model", 10, DateTimeOffset.UtcNow);

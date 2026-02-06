@@ -1,8 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents;
 using InfoDumpManager.Application.Agents.Implementations;
+using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
+using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Domain.Repositories;
+using InfoDumpManager.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -13,6 +17,9 @@ namespace InfoDumpManager.Tests.Unit.AIAgents;
 public sealed class SummarizationAgentTests
 {
     private readonly Mock<ILLMProvider> _mockLlmProvider;
+    private readonly Mock<ILLMRateLimiter> _mockRateLimiter;
+    private readonly Mock<IGEMRepository> _mockGemRepository;
+    private readonly Mock<ITextCache> _mockTextCache;
     private readonly Mock<ICostManager> _mockCostManager;
     private readonly Mock<ILogger<SummarizationAgent>> _mockLogger;
     private readonly SummarizationAgent _agent;
@@ -20,9 +27,30 @@ public sealed class SummarizationAgentTests
     public SummarizationAgentTests()
     {
         _mockLlmProvider = new Mock<ILLMProvider>();
+        _mockRateLimiter = new Mock<ILLMRateLimiter>();
+        _mockGemRepository = new Mock<IGEMRepository>();
+        _mockTextCache = new Mock<ITextCache>();
         _mockCostManager = new Mock<ICostManager>();
         _mockLogger = new Mock<ILogger<SummarizationAgent>>();
-        _agent = new SummarizationAgent(_mockLlmProvider.Object, _mockCostManager.Object, _mockLogger.Object);
+        _agent = new SummarizationAgent(
+            _mockLlmProvider.Object,
+            _mockRateLimiter.Object,
+            _mockGemRepository.Object,
+            _mockTextCache.Object,
+            _mockCostManager.Object,
+            _mockLogger.Object);
+
+        _mockRateLimiter
+            .Setup(x => x.ExecuteAsync(It.IsAny<Guid>(), It.IsAny<Func<CancellationToken, Task<LLMResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Guid, Func<CancellationToken, Task<LLMResponse>>, CancellationToken>((_, func, ct) => func(ct));
+
+        _mockTextCache
+            .Setup(x => x.TryGetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        _mockTextCache
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 
     [Fact]
@@ -43,8 +71,14 @@ public sealed class SummarizationAgentTests
     public async Task ExecuteAsync_WithValidContent_ShouldReturnSuccessResult()
     {
         // Arrange
-        var context = CreateTestContext("This is a long content that needs summarization.");
+        var tenantId = Guid.NewGuid();
+        var gem = CreateGem(tenantId);
+        var context = CreateTestContext(tenantId, "This is a long content that needs summarization.");
         var expectedSummary = "Summarized content";
+
+        _mockGemRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -69,7 +103,13 @@ public sealed class SummarizationAgentTests
     public async Task ExecuteAsync_WithCostBudgetDenied_ShouldReturnFailureWithoutCallingProvider()
     {
         // Arrange
-        var context = CreateTestContext("Content to summarize");
+        var tenantId = Guid.NewGuid();
+        var gem = CreateGem(tenantId);
+        var context = CreateTestContext(tenantId, "Content to summarize");
+
+        _mockGemRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -90,7 +130,13 @@ public sealed class SummarizationAgentTests
     public async Task ExecuteAsync_WithLLMFailure_ShouldReturnFailureResult()
     {
         // Arrange
-        var context = CreateTestContext("Content to summarize");
+        var tenantId = Guid.NewGuid();
+        var gem = CreateGem(tenantId);
+        var context = CreateTestContext(tenantId, "Content to summarize");
+
+        _mockGemRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -126,8 +172,14 @@ public sealed class SummarizationAgentTests
     public async Task ExecuteAsync_ShouldTrackTokenCountAccurately()
     {
         // Arrange
-        var context = CreateTestContext("Content with specific token count");
+        var tenantId = Guid.NewGuid();
+        var gem = CreateGem(tenantId);
+        var context = CreateTestContext(tenantId, "Content with specific token count");
         var expectedTokens = 42;
+
+        _mockGemRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -146,16 +198,58 @@ public sealed class SummarizationAgentTests
         Assert.Equal(0.005m, result.Metrics.EstimatedCost);
     }
 
-    private static AgentContext CreateTestContext(string contentText)
+    [Fact]
+    public async Task ExecuteAsync_WithCacheHit_ShouldReturnCachedSummary()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var gem = CreateGem(tenantId);
+        var context = CreateTestContext(tenantId, "Content for cache");
+
+        _mockGemRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(gem);
+
+        var cached = new
+        {
+            Text = "Cached summary",
+            Model = "gpt-4",
+            Tokens = 12,
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+
+        _mockTextCache
+            .Setup(x => x.TryGetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(System.Text.Json.JsonSerializer.Serialize(cached));
+
+        // Act
+        var result = await _agent.ExecuteAsync(context);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal("Cached summary", result.Data.Payload["summary"]);
+        _mockLlmProvider.Verify(
+            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    private static AgentContext CreateTestContext(Guid tenantId, string contentText)
     {
         return new AgentContext(
             Guid.NewGuid(),
-            Guid.NewGuid(),
+            tenantId,
             contentText,
             new AgentContextMetadata(
                 "test-source",
                 100,
                 DateTimeOffset.UtcNow,
                 new Dictionary<string, object>()));
+    }
+
+    private static GEM CreateGem(Guid tenantId)
+    {
+        var source = new GEMSource("https://example.com", "Example");
+        var snapshot = new GEMSnapshot("<html>content</html>");
+        return GEM.Create(tenantId, "Title", "https://example.com/page", source, snapshot, GEMSummary.Empty);
     }
 }

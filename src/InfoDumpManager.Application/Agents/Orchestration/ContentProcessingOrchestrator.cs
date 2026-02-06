@@ -1,8 +1,13 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Threading.Channels;
 using InfoDumpManager.Application.Agents;
+using InfoDumpManager.Application.Common.Events;
+using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Domain.Events;
 using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Domain.ValueObjects;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -49,9 +54,32 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
             .GroupBy(agent => agent.Capability)
             .ToDictionary(group => group.Key, group => group.First());
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         try
         {
+            if (options.RunValidation)
+            {
+                var validationAgent = ResolveAgent(agentMap, AgentCapability.Validation, errors);
+                if (validationAgent is null)
+                {
+                    UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 10, "Validation skipped (agent unavailable)");
+                }
+                else
+                {
+                    validation = await validationAgent.ExecuteAsync(CreateContext(gemId, tenantId, contentText, options));
+
+                    if (!validation.Success)
+                    {
+                        errors.AddRange(validation.Errors ?? new());
+                        return CreateFailedResult(resolvedJobId, gemId, summary, summarization, categorization, tagging, validation, errors);
+                    }
+
+                    await LogValidationAsync(unitOfWork, tenantId, gemId, validation).ConfigureAwait(false);
+                    UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 15, "Validation complete");
+                }
+            }
+
             var summarizationAgent = ResolveAgent(agentMap, AgentCapability.Summarization, errors);
             if (summarizationAgent is null)
             {
@@ -67,7 +95,14 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
             }
 
             summary = TryBuildSummary(summarization);
-            await PersistSummaryAsync(unitOfWork, gemId, summary);
+            await PersistSummaryAsync(unitOfWork, gemId, summary).ConfigureAwait(false);
+            await LogSummarizationAsync(unitOfWork, tenantId, gemId, summarization).ConfigureAwait(false);
+            await PublishEventAsync(mediator, new GEMSummarizationCompleted(
+                gemId,
+                tenantId,
+                summary?.Text ?? string.Empty,
+                summary?.TokenCount ?? 0,
+                DateTimeOffset.UtcNow)).ConfigureAwait(false);
             UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 25, "Summarization complete");
 
             var categorizationAgent = ResolveAgent(agentMap, AgentCapability.Categorization, errors);
@@ -78,6 +113,11 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 if (!categorization.Success)
                 {
                     errors.AddRange(categorization.Errors ?? new());
+                }
+                else
+                {
+                    await HandleCategorizationAsync(unitOfWork, mediator, tenantId, gemId, categorization, options)
+                        .ConfigureAwait(false);
                 }
             }
 
@@ -92,28 +132,13 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 {
                     errors.AddRange(tagging.Errors ?? new());
                 }
+                else
+                {
+                    await HandleTaggingAsync(unitOfWork, mediator, tenantId, gemId, tagging).ConfigureAwait(false);
+                }
             }
 
             UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 75, "Tagging complete");
-
-            if (options.RunValidation)
-            {
-                var validationAgent = ResolveAgent(agentMap, AgentCapability.Validation, errors);
-                if (validationAgent is null)
-                {
-                    UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 90, "Validation skipped (agent unavailable)");
-                }
-                else
-                {
-                    validation = await validationAgent.ExecuteAsync(CreateContext(gemId, tenantId, contentText, options));
-
-                    if (!validation.Success)
-                    {
-                        errors.AddRange(validation.Errors ?? new());
-                        return CreateFailedResult(resolvedJobId, gemId, summary, summarization, categorization, tagging, validation, errors);
-                    }
-                }
-            }
 
             UpdateStatus(resolvedJobId, ProcessingStatus.Completed, 100, "Processing complete");
 
@@ -283,6 +308,228 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
         gem.UpdateSummary(summary);
         await unitOfWork.SaveChangesAsync();
     }
+
+    private static async Task HandleCategorizationAsync(
+        IUnitOfWork unitOfWork,
+        IMediator mediator,
+        Guid tenantId,
+        Guid gemId,
+        AgentResult categorization,
+        ProcessingOptions options)
+    {
+        var suggestion = TryBuildCategorizationSuggestion(categorization);
+        if (suggestion is null)
+        {
+            return;
+        }
+
+        var suggestionEntity = CategorySuggestion.Create(
+            tenantId,
+            gemId,
+            suggestion.SuggestedCategoryId,
+            suggestion.ProposedCategoryName,
+            suggestion.ConfidenceScore,
+            suggestion.Rationale,
+            false);
+
+        await unitOfWork.CategorySuggestions.AddAsync(suggestionEntity).ConfigureAwait(false);
+
+        var autoAssigned = false;
+        if (suggestion.SuggestedCategoryId.HasValue && suggestion.ConfidenceScore >= options.AutoApproveThreshold)
+        {
+            var gem = await unitOfWork.GEMs.GetByIdAsync(gemId).ConfigureAwait(false);
+            var category = await unitOfWork.Categories.GetByIdAsync(suggestion.SuggestedCategoryId.Value).ConfigureAwait(false);
+            if (gem is not null && category is not null && category.TenantId == tenantId)
+            {
+                gem.AssignCategory(category);
+                autoAssigned = true;
+                suggestionEntity.MarkAutoAssigned(true);
+
+                await unitOfWork.ActivityLogs.AddAsync(ActivityLog.Create(
+                    tenantId,
+                    ActivityEventType.CategorizationAccepted,
+                    nameof(GEM),
+                    $"GEM auto-assigned to category {category.Name}",
+                    gemId,
+                    null,
+                    BuildMetadata(new
+                    {
+                        gemId,
+                        categoryId = category.Id,
+                        categoryName = category.Name,
+                        suggestion.ConfidenceScore
+                    }))).ConfigureAwait(false);
+            }
+        }
+
+        await unitOfWork.ActivityLogs.AddAsync(ActivityLog.Create(
+            tenantId,
+            ActivityEventType.CategorizationSuggested,
+            nameof(GEM),
+            "Categorization suggested",
+            gemId,
+            null,
+            BuildMetadata(new
+            {
+                gemId,
+                suggestion.SuggestedCategoryId,
+                suggestion.ProposedCategoryName,
+                suggestion.ConfidenceScore,
+                suggestion.Rationale,
+                autoAssigned
+            }))).ConfigureAwait(false);
+
+        await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+
+        await PublishEventAsync(mediator, new GEMCategorizationSuggested(
+            gemId,
+            suggestion.SuggestedCategoryId,
+            suggestion.ConfidenceScore,
+            suggestion.ConfidenceScore < 0.6,
+            DateTimeOffset.UtcNow)).ConfigureAwait(false);
+    }
+
+    private static async Task HandleTaggingAsync(
+        IUnitOfWork unitOfWork,
+        IMediator mediator,
+        Guid tenantId,
+        Guid gemId,
+        AgentResult tagging)
+    {
+        var suggestions = TryBuildTagSuggestions(tagging);
+        if (suggestions.Count == 0)
+        {
+            return;
+        }
+
+        await unitOfWork.ActivityLogs.AddAsync(ActivityLog.Create(
+            tenantId,
+            ActivityEventType.TaggingSuggested,
+            nameof(GEM),
+            "Tagging suggested",
+            gemId,
+            null,
+            BuildMetadata(new
+            {
+                gemId,
+                tags = suggestions.Select(s => new { s.TagId, s.TagName, s.SimilarityScore }).ToList()
+            }))).ConfigureAwait(false);
+
+        await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+
+        var eventTags = suggestions
+            .Select(s => new TagSuggestionDetail(s.TagId, s.TagName, s.SimilarityScore))
+            .ToList();
+
+        await PublishEventAsync(mediator, new GEMTaggingSuggested(
+            gemId,
+            tenantId,
+            eventTags,
+            DateTimeOffset.UtcNow)).ConfigureAwait(false);
+    }
+
+    private static async Task LogSummarizationAsync(
+        IUnitOfWork unitOfWork,
+        Guid tenantId,
+        Guid gemId,
+        AgentResult summarization)
+    {
+        var metadata = BuildMetadata(new
+        {
+            gemId,
+            model = summarization.Data.Payload.TryGetValue("model", out var model) ? model : null,
+            tokenCount = summarization.Data.Payload.TryGetValue("tokenCount", out var tokens) ? tokens : null,
+            cacheHit = summarization.Data.Payload.TryGetValue("cacheHit", out var cacheHit) ? cacheHit : null,
+            cost = summarization.Metrics.EstimatedCost
+        });
+
+        await unitOfWork.ActivityLogs.AddAsync(ActivityLog.Create(
+            tenantId,
+            ActivityEventType.SummarizationCompleted,
+            nameof(GEM),
+            "Summarization completed",
+            gemId,
+            null,
+            metadata)).ConfigureAwait(false);
+
+        await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    private static async Task LogValidationAsync(
+        IUnitOfWork unitOfWork,
+        Guid tenantId,
+        Guid gemId,
+        AgentResult validation)
+    {
+        var metadata = BuildMetadata(new
+        {
+            gemId,
+            status = validation.Data.Payload.TryGetValue("status", out var status) ? status : null,
+            response = validation.Data.Payload.TryGetValue("response", out var response) ? response : null,
+            confidence = validation.Confidence?.Score
+        });
+
+        await unitOfWork.ActivityLogs.AddAsync(ActivityLog.Create(
+            tenantId,
+            ActivityEventType.ValidationCompleted,
+            nameof(GEM),
+            "Validation completed",
+            gemId,
+            null,
+            metadata)).ConfigureAwait(false);
+
+        await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    private static CategorizationSuggestionData? TryBuildCategorizationSuggestion(AgentResult result)
+    {
+        var payload = result.Data.Payload;
+        Guid? categoryId = null;
+        if (payload.TryGetValue("suggestedCategoryId", out var idObj)
+            && idObj is string idText
+            && Guid.TryParse(idText, out var parsed))
+        {
+            categoryId = parsed;
+        }
+
+        var name = payload.TryGetValue("suggestedCategory", out var nameObj) ? nameObj as string : null;
+        var proposedName = payload.TryGetValue("proposedCategoryName", out var proposedObj) ? proposedObj as string : null;
+        var confidence = payload.TryGetValue("confidence", out var confObj) && confObj is double conf
+            ? conf
+            : result.Confidence?.Score ?? 0.0;
+        var rationale = payload.TryGetValue("rationale", out var rationaleObj) ? rationaleObj as string : null;
+
+        if (!categoryId.HasValue && string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(proposedName))
+        {
+            return null;
+        }
+
+        return new CategorizationSuggestionData(categoryId, name ?? proposedName, proposedName, confidence, rationale);
+    }
+
+    private static List<TagSuggestionResult> TryBuildTagSuggestions(AgentResult result)
+    {
+        if (result.Data.Payload.TryGetValue("suggestedTags", out var tagsObj)
+            && tagsObj is List<TagSuggestionResult> suggestions)
+        {
+            return suggestions;
+        }
+
+        return new List<TagSuggestionResult>();
+    }
+
+    private static JsonDocument BuildMetadata(object payload)
+        => JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+    private static Task PublishEventAsync(IMediator mediator, IDomainEvent domainEvent)
+        => mediator.Publish(new DomainEventNotification(domainEvent));
+
+    private sealed record CategorizationSuggestionData(
+        Guid? SuggestedCategoryId,
+        string? SuggestedCategoryName,
+        string? ProposedCategoryName,
+        double ConfidenceScore,
+        string? Rationale);
 
     private ProcessingResult CreateFailedResult(
         Guid jobId,

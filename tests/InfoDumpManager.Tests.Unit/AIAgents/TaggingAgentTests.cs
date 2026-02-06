@@ -1,9 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents;
 using InfoDumpManager.Application.Agents.Implementations;
+using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Application.Services.LLM;
+using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -13,27 +16,71 @@ namespace InfoDumpManager.Tests.Unit.AIAgents;
 [ExcludeFromCodeCoverage]
 public sealed class TaggingAgentTests
 {
-    private readonly Mock<ILLMProvider> _mockLlmProvider;
     private readonly Mock<IEmbeddingProvider> _mockEmbeddingProvider;
     private readonly Mock<IVectorStore> _mockVectorStore;
+    private readonly Mock<IEmbeddingCache> _mockEmbeddingCache;
+    private readonly Mock<ITextCache> _mockTextCache;
+    private readonly Mock<ITagRepository> _mockTagRepository;
+    private readonly Mock<ILLMProvider> _mockLlmProvider;
+    private readonly Mock<ILLMRateLimiter> _mockRateLimiter;
     private readonly Mock<ICostManager> _mockCostManager;
     private readonly Mock<ILogger<TaggingAgent>> _mockLogger;
     private readonly TaggingAgent _agent;
 
     public TaggingAgentTests()
     {
-        _mockLlmProvider = new Mock<ILLMProvider>();
         _mockEmbeddingProvider = new Mock<IEmbeddingProvider>();
         _mockVectorStore = new Mock<IVectorStore>();
+        _mockEmbeddingCache = new Mock<IEmbeddingCache>();
+        _mockTextCache = new Mock<ITextCache>();
+        _mockTagRepository = new Mock<ITagRepository>();
+        _mockLlmProvider = new Mock<ILLMProvider>();
+        _mockRateLimiter = new Mock<ILLMRateLimiter>();
         _mockCostManager = new Mock<ICostManager>();
         _mockLogger = new Mock<ILogger<TaggingAgent>>();
 
         _agent = new TaggingAgent(
-            _mockLlmProvider.Object,
             _mockEmbeddingProvider.Object,
             _mockVectorStore.Object,
+            _mockEmbeddingCache.Object,
+            _mockTextCache.Object,
+            _mockTagRepository.Object,
+            _mockLlmProvider.Object,
+            _mockRateLimiter.Object,
             _mockCostManager.Object,
             _mockLogger.Object);
+
+        _mockEmbeddingCache
+            .Setup(x => x.TryGetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((float[]?)null);
+
+        _mockEmbeddingCache
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<float[]>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockTextCache
+            .Setup(x => x.TryGetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        _mockTextCache
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _mockVectorStore
+            .Setup(x => x.SearchSimilarAsync(It.IsAny<EmbeddingSearchRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EmbeddingSearchResult>());
+
+        _mockTagRepository
+            .Setup(x => x.ListByTenantAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Tag>());
+
+        _mockRateLimiter
+            .Setup(x => x.ExecuteAsync(It.IsAny<Guid>(), It.IsAny<Func<CancellationToken, Task<LLMResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Guid, Func<CancellationToken, Task<LLMResponse>>, CancellationToken>((_, func, ct) => func(ct));
+
+        _mockLlmProvider
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LLMResponse("[]", "gpt-4", "test", 5, 0.0001m, "completed", 0));
     }
 
     [Fact]
@@ -51,22 +98,31 @@ public sealed class TaggingAgentTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldExtractTagsFromLLMResponse()
+    public async Task ExecuteAsync_ShouldReturnSuggestionsFromVectorStore()
     {
         // Arrange
         var context = CreateTestContext("Article about machine learning and neural networks");
+        var tenantId = context.TenantId;
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
-        _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LLMResponse("machine-learning, neural-networks, ai, technology", "gpt-4", "test", 30, 0.001m, "completed", 0));
-
         _mockEmbeddingProvider
             .Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EmbeddingResponse(new float[] { 0.1f, 0.2f }, "model", "openai", 10, 0.0001m));
+
+        var tagId = Guid.NewGuid();
+        _mockVectorStore
+            .Setup(x => x.SearchSimilarAsync(It.IsAny<EmbeddingSearchRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EmbeddingSearchResult>
+            {
+                new EmbeddingSearchResult(tagId, 0.1, "{}")
+            });
+
+        _mockTagRepository
+            .Setup(x => x.ListByIdsAsync(tenantId, It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Tag> { CreateTag(tenantId, tagId, "machine-learning") });
 
         // Act
         var result = await _agent.ExecuteAsync(context);
@@ -81,18 +137,28 @@ public sealed class TaggingAgentTests
     {
         // Arrange
         var context = CreateTestContext("Content with duplicate concepts");
+        var tenantId = context.TenantId;
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
-        _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LLMResponse("technology, tech, technology, innovation", "gpt-4", "test", 20, 0.001m, "completed", 0));
-
         _mockEmbeddingProvider
             .Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EmbeddingResponse(new float[] { 0.1f }, "model", "openai", 5, 0.0001m));
+
+        var tagId = Guid.NewGuid();
+        _mockVectorStore
+            .Setup(x => x.SearchSimilarAsync(It.IsAny<EmbeddingSearchRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EmbeddingSearchResult>
+            {
+                new EmbeddingSearchResult(tagId, 0.1, "{}"),
+                new EmbeddingSearchResult(tagId, 0.2, "{}")
+            });
+
+        _mockTagRepository
+            .Setup(x => x.ListByIdsAsync(tenantId, It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Tag> { CreateTag(tenantId, tagId, "technology") });
 
         // Act
         var result = await _agent.ExecuteAsync(context);
@@ -114,21 +180,15 @@ public sealed class TaggingAgentTests
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
-        _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LLMResponse("tag1, tag2", "gpt-4", "test", 20, 0.001m, "completed", 0));
-
         _mockEmbeddingProvider
             .Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EmbeddingResponse(new float[] { 0.1f, 0.2f }, "model", "openai", 10, 0.0001m));
 
         // Act
-        await _agent.ExecuteAsync(context);
+        var result = await _agent.ExecuteAsync(context);
 
         // Assert
-        _mockVectorStore.Verify(
-            x => x.StoreAsync(It.IsAny<EmbeddingRecord>(), It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce);
+        Assert.True(result.Success);
     }
 
     [Fact]
@@ -141,10 +201,6 @@ public sealed class TaggingAgentTests
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
-        _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LLMResponse("tag1", "gpt-4", "test", 10, 0.001m, "completed", 0));
-
         _mockEmbeddingProvider
             .Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Embedding service down"));
@@ -153,9 +209,7 @@ public sealed class TaggingAgentTests
         var result = await _agent.ExecuteAsync(context);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.NotNull(result.Errors);
-        Assert.Contains(result.Errors, e => e.Contains("Embedding service down"));
+        Assert.True(result.Success);
     }
 
     [Fact]
@@ -173,9 +227,67 @@ public sealed class TaggingAgentTests
 
         // Assert
         Assert.False(result.Success);
-        _mockLlmProvider.Verify(
-            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()),
+        _mockEmbeddingProvider.Verify(
+            x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCacheHit_ShouldReturnCachedTags()
+    {
+        // Arrange
+        var context = CreateTestContext("Content for cache");
+
+        _mockCostManager
+            .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
+
+        var cached = new List<TagSuggestionResult>
+        {
+            new(Guid.Empty, "cache-tag", 0.8)
+        };
+
+        _mockTextCache
+            .Setup(x => x.TryGetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(System.Text.Json.JsonSerializer.Serialize(cached));
+
+        // Act
+        var result = await _agent.ExecuteAsync(context);
+
+        // Assert
+        Assert.True(result.Success);
+        _mockVectorStore.Verify(
+            x => x.SearchSimilarAsync(It.IsAny<EmbeddingSearchRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenVectorStoreReturnsNoMatches_ShouldUseLlmFallback()
+    {
+        // Arrange
+        var context = CreateTestContext("Content without known tags");
+
+        _mockCostManager
+            .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
+
+        _mockEmbeddingProvider
+            .Setup(x => x.GenerateEmbeddingAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EmbeddingResponse(new float[] { 0.1f }, "model", "openai", 5, 0.0001m));
+
+        _mockLlmProvider
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LLMResponse("[\"llm-tag\",\"another\"]", "gpt-4", "test", 12, 0.0002m, "completed", 0));
+
+        // Act
+        var result = await _agent.ExecuteAsync(context);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Contains("llm-tag", (List<string>)result.Data.Payload["tags"]);
+        _mockRateLimiter.Verify(
+            x => x.ExecuteAsync(It.IsAny<Guid>(), It.IsAny<Func<CancellationToken, Task<LLMResponse>>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private static AgentContext CreateTestContext(string contentText)
@@ -189,5 +301,12 @@ public sealed class TaggingAgentTests
                 100,
                 DateTimeOffset.UtcNow,
                 new Dictionary<string, object>()));
+    }
+
+    private static Tag CreateTag(Guid tenantId, Guid tagId, string name)
+    {
+        var tag = Tag.Create(tenantId, name, Guid.NewGuid());
+        typeof(Tag).GetProperty("Id")!.SetValue(tag, tagId);
+        return tag;
     }
 }

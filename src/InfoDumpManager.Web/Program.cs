@@ -6,12 +6,14 @@ using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Common.Services;
 using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.Services;
+using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Infrastructure.Data;
 using InfoDumpManager.Infrastructure.Repositories;
+using InfoDumpManager.Infrastructure.Services.Caching;
 using InfoDumpManager.Infrastructure.Services.Embeddings;
 using InfoDumpManager.Infrastructure.Services.LLM;
 using InfoDumpManager.Infrastructure.Services;
@@ -48,9 +50,12 @@ builder.Services.AddScoped<ICurrentUserContext, WebCurrentUserContext>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IGEMRepository, GEMRepository>();
+builder.Services.AddScoped<ITagRepository, TagRepository>();
+builder.Services.AddScoped<ICategorySuggestionRepository, CategorySuggestionRepository>();
 builder.Services.AddScoped<ICostUsageRepository, CostUsageRepository>();
 builder.Services.AddScoped<ICostManager, CostManagerImpl>();
 builder.Services.Configure<CostManagementOptions>(builder.Configuration.GetSection("CostManagement"));
+builder.Services.Configure<LLMRateLimitOptions>(builder.Configuration.GetSection("LLMRateLimit"));
 
 builder.Services.Configure<WebScrapingOptions>(builder.Configuration.GetSection("WebScraping"));
 builder.Services.AddScoped<IWebScrapingService, WebScrapingService>();
@@ -66,9 +71,11 @@ builder.Services.AddScoped<IAgent, ValidationAgent>();
 
 builder.Services.AddSingleton<Kernel>(_ => Kernel.CreateBuilder().Build());
 builder.Services.AddSingleton<ILLMProvider, SemanticKernelProvider>();
+builder.Services.AddSingleton<ILLMRateLimiter, TenantRateLimiter>();
 builder.Services.AddScoped<IEmbeddingProvider, DeterministicEmbeddingProvider>();
 builder.Services.AddScoped<IVectorStore, PostgreSqlVectorStore>();
 builder.Services.AddSingleton<IEmbeddingCache, RedisEmbeddingCache>();
+builder.Services.AddSingleton<ITextCache, RedisTextCache>();
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 {
     var redisConfiguration = builder.Configuration.GetConnectionString("Redis")

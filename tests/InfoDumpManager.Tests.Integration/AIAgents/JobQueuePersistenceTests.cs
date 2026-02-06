@@ -140,7 +140,7 @@ public sealed class JobQueuePersistenceTests
     }
 
     [Fact]
-    public async Task JobQueue_PersistenceHealthCheck_ShouldIndicateStorageType()
+    public void JobQueue_PersistenceHealthCheck_ShouldIndicateStorageType()
     {
         // Arrange
         var logger = Mock.Of<ILogger<InMemoryJobQueue<ProcessingJob>>>();

@@ -88,7 +88,7 @@ public sealed class SemanticKernelProviderTests
     //}
 
     [Fact]
-    public async Task CallAsync_WithCircuitBreakerOpen_ShouldFailFast()
+    public void CallAsync_WithCircuitBreakerOpen_ShouldFailFast()
     {
         // Arrange
         // This test would verify circuit breaker behavior after repeated failures
@@ -99,7 +99,7 @@ public sealed class SemanticKernelProviderTests
     }
 
     [Fact]
-    public async Task CallAsync_ShouldTrackTokenUsage()
+    public void CallAsync_ShouldTrackTokenUsage()
     {
         // Arrange
         _ = "Count tokens in this prompt";
@@ -131,43 +131,41 @@ public sealed class SemanticKernelProviderTests
         var mockFallback = new Mock<ILLMProvider>();
 
         mockPrimary
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
             .Throws(new HttpRequestException("Primary provider unavailable"));
 
         mockFallback
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
                 callCount++;
-                return new LLMResponse("Fallback result", 100, "fallback-model", TimeSpan.FromMilliseconds(200));
+                return new LLMResponse("Fallback result", "gpt-3.5-turbo", "fallback", 100, 0.001m, "completed", 0);
             });
 
         // Act - Try primary, fall back to secondary
         LLMResponse? response = null;
         try
         {
-            response = await mockPrimary.Object.GenerateAsync("test", new LLMOptions("gpt-4", 100, 0.7), CancellationToken.None);
+            response = await mockPrimary.Object.CallAsync("test", "gpt-4", 100, 0.7f, CancellationToken.None);
         }
         catch
         {
-            response = await mockFallback.Object.GenerateAsync("test", new LLMOptions("gpt-3.5-turbo", 100, 0.7), CancellationToken.None);
+            response = await mockFallback.Object.CallAsync("test", "gpt-3.5-turbo", 100, 0.7f, CancellationToken.None);
         }
 
         // Assert
         Assert.NotNull(response);
         Assert.Equal("Fallback result", response.Content);
         Assert.Equal(1, callCount);
-        mockFallback.Verify(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        mockFallback.Verify(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task SemanticKernelProvider_WithTransientFailure_ShouldRetryCorrectly()
+    public void SemanticKernelProvider_WithTransientFailure_ShouldRetryCorrectly()
     {
         // Medium Priority Test #12 - Semantic Kernel Retry Policy Tests
         // Arrange
-        var attemptCount = 0;
-        var mockKernel = new Mock<Kernel>();
-        
+
         // This test documents expected retry behavior with Polly
         // In actual implementation, Polly would handle retries for transient failures
         
@@ -182,11 +180,11 @@ public sealed class SemanticKernelProviderTests
     }
 
     [Fact]
-    public async Task SemanticKernelProvider_WithPermanentFailure_ShouldNotRetry()
+    public void SemanticKernelProvider_WithPermanentFailure_ShouldNotRetry()
     {
         // Arrange
-        var attemptCount = 0;
-        
+        _ = 0;
+
         // Act & Assert
         Assert.True(true); // Placeholder
         

@@ -92,3 +92,14 @@ public sealed record AgentResultConfidence(
     double Score,
     bool RequiresManualReview,
     string Reasoning);
+
+/// <summary>
+/// Tag suggestion output from tagging agent.
+/// </summary>
+/// <param name="TagId">Tag identifier.</param>
+/// <param name="TagName">Tag name.</param>
+/// <param name="SimilarityScore">Similarity score from 0.0 to 1.0.</param>
+public sealed record TagSuggestionResult(
+    Guid TagId,
+    string TagName,
+    double SimilarityScore);

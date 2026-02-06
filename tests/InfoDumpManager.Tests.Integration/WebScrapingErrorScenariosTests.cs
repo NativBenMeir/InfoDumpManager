@@ -122,7 +122,7 @@ public sealed class WebScrapingErrorScenariosTests
         var service = new WebScrapingService(options, NullLogger<WebScrapingService>.Instance);
 
         // Act
-        Func<Task> act = () => service.ScrapeAsync(null);
+        Func<Task> act = () => service.ScrapeAsync(null!);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();
@@ -246,7 +246,7 @@ public sealed class MinioStorageErrorScenariosTests
         var service = new MinioStorageService(options, NullLogger<MinioStorageService>.Instance);
 
         // Act
-        Func<Task> act = () => service.UploadSnapshotAsync(null, "<html></html>", "text/html");
+        Func<Task> act = () => service.UploadSnapshotAsync(null!, "<html></html>", "text/html");
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();
@@ -290,7 +290,7 @@ public sealed class MinioStorageErrorScenariosTests
         var service = new MinioStorageService(options, NullLogger<MinioStorageService>.Instance);
 
         // Act
-        Func<Task> act = () => service.UploadSnapshotAsync("key.html", null, "text/html");
+        Func<Task> act = () => service.UploadSnapshotAsync("key.html", null!, "text/html");
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();
@@ -356,7 +356,7 @@ public sealed class MinioStorageErrorScenariosTests
         var service = new MinioStorageService(options, NullLogger<MinioStorageService>.Instance);
 
         // Act
-        Func<Task> act = () => service.GetSnapshotAsync(null);
+        Func<Task> act = () => service.GetSnapshotAsync(null!);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();

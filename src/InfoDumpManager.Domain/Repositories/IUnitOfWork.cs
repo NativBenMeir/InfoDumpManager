@@ -8,6 +8,8 @@ public interface IUnitOfWork : IAsyncDisposable
 {
     IGEMRepository GEMs { get; }
     ICategoryRepository Categories { get; }
+    ITagRepository Tags { get; }
+    ICategorySuggestionRepository CategorySuggestions { get; }
     IActivityLogRepository ActivityLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

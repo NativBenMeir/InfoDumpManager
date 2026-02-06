@@ -44,21 +44,21 @@ public sealed class RedisEmbeddingCacheIntegrationTests
     }
 
     [Fact]
-    public async Task GetAsync_ShouldRetrieveFromCache()
+    public void GetAsync_ShouldRetrieveFromCache()
     {
         // Test cache retrieval
         Assert.True(true); // Placeholder
     }
 
     [Fact]
-    public async Task GetAsync_WithExpiredKey_ShouldReturnNull()
+    public void GetAsync_WithExpiredKey_ShouldReturnNull()
     {
         // Test TTL expiration
         Assert.True(true); // Placeholder
     }
 
     [Fact]
-    public async Task Cache_ShouldReduceEmbeddingProviderCalls()
+    public void Cache_ShouldReduceEmbeddingProviderCalls()
     {
         // Test that cache hits prevent provider calls
         Assert.True(true); // Placeholder

@@ -25,7 +25,7 @@ When generating code for the InfoDumpManager repository, follow these priorities
 - **AutoMapper**: 12.0.1 (Entity-to-DTO mapping)
 - **Polly**: 8.6.5 (Resilience patterns)
 - **Serilog**: 4.3.0 (Structured logging)
-- **Semantic Kernel**: 1.18.0 (LLM orchestration)
+- **Semantic Kernel**: 1.70.0 (LLM orchestration)
 - **xUnit**: 2.5.3 with FluentAssertions 8.8.0, Moq 4.20.72, Testcontainers 4.10.0
 
 ### Key Patterns

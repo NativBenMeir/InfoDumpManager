@@ -14,7 +14,7 @@ namespace InfoDumpManager.Tests.Unit.AIAgents;
 public sealed class PerformanceBenchmarkTests
 {
     [Fact(Skip = "Performance benchmark - run manually")]
-    public async Task BatchProcessing_ShouldMeetThroughputTarget()
+    public void BatchProcessing_ShouldMeetThroughputTarget()
     {
         // Benchmark batch processing throughput
         // Target: X GEMs per second
@@ -22,7 +22,7 @@ public sealed class PerformanceBenchmarkTests
     }
 
     [Fact(Skip = "Performance benchmark - run manually")]
-    public async Task EmbeddingGeneration_ShouldMeetLatencyTarget()
+    public void EmbeddingGeneration_ShouldMeetLatencyTarget()
     {
         // Benchmark embedding generation latency
         // Target: < 100ms per embedding
@@ -30,7 +30,7 @@ public sealed class PerformanceBenchmarkTests
     }
 
     [Fact(Skip = "Performance benchmark - run manually")]
-    public async Task VectorSearch_ShouldScaleWithDataSize()
+    public void VectorSearch_ShouldScaleWithDataSize()
     {
         // Benchmark vector search at scale
         // Test with 10k, 100k, 1M vectors
@@ -93,7 +93,7 @@ public sealed class AgentConfigurationTests
 public sealed class DomainEventHandlerTests
 {
     [Fact]
-    public async Task Orchestrator_DuringPipeline_ShouldPublishAllLifecycleEvents()
+    public void Orchestrator_DuringPipeline_ShouldPublishAllLifecycleEvents()
     {
         // Medium Priority Test #13 - Domain Event Publishing Tests
         // Arrange
@@ -128,7 +128,7 @@ public sealed class DomainEventHandlerTests
     }
 
     [Fact]
-    public async Task EventOrdering_ShouldBeCorrect()
+    public void EventOrdering_ShouldBeCorrect()
     {
         // Test events published in correct order
         // Expected: Created -> SummarizationStarted -> SummarizationCompleted -> etc.
@@ -150,7 +150,7 @@ public sealed class DomainEventHandlerTests
     }
 
     [Fact]
-    public async Task EventPersistence_ShouldSupportAuditTrail()
+    public void EventPersistence_ShouldSupportAuditTrail()
     {
         // Test events can be persisted for audit trail
         var auditLog = new List<(Guid GemId, string EventType, DateTimeOffset Timestamp, string Details)>();
@@ -165,7 +165,7 @@ public sealed class DomainEventHandlerTests
     }
 
     [Fact]
-    public async Task DomainEvents_WhenAgentFails_ShouldPublishFailureEvent()
+    public void DomainEvents_WhenAgentFails_ShouldPublishFailureEvent()
     {
         // Arrange
         var publishedEvents = new List<string>();
@@ -189,7 +189,7 @@ public sealed class DomainEventHandlerTests
 public sealed class JobStatusWatchingTests
 {
     [Fact]
-    public async Task JobWatcher_WhenJobCompletes_ShouldNotifySubscribers()
+    public void JobWatcher_WhenJobCompletes_ShouldNotifySubscribers()
     {
         // Medium Priority Test #14 - Job Status Watching Real-Time Tests
         // Arrange
@@ -262,7 +262,7 @@ public sealed class JobStatusWatchingTests
     }
 
     [Fact]
-    public async Task MultipleWatchers_ShouldReceiveUpdates()
+    public void MultipleWatchers_ShouldReceiveUpdates()
     {
         // Test multiple watchers on same job
         var watcher1Updates = new List<string>();

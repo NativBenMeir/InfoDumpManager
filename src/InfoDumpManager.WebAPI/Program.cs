@@ -11,6 +11,7 @@ using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Common.Services;
 using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.Services;
+using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Application.Services.LLM;
@@ -19,6 +20,7 @@ using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Infrastructure.Data;
 using InfoDumpManager.Infrastructure.Repositories;
+using InfoDumpManager.Infrastructure.Services.Caching;
 using InfoDumpManager.Infrastructure.Services.Embeddings;
 using InfoDumpManager.Infrastructure.Services.LLM;
 using InfoDumpManager.Infrastructure.Services;
@@ -217,9 +219,12 @@ public class Program
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IGEMRepository, GEMRepository>();
+        services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<ICategorySuggestionRepository, CategorySuggestionRepository>();
         services.AddScoped<ICostUsageRepository, CostUsageRepository>();
         services.AddScoped<ICostManager, CostManagerImpl>();
         services.Configure<CostManagementOptions>(configuration.GetSection("CostManagement"));
+        services.Configure<LLMRateLimitOptions>(configuration.GetSection("LLMRateLimit"));
         services.Configure<MinioOptions>(configuration.GetSection("Minio"));
         services.Configure<WebScrapingOptions>(configuration.GetSection("WebScraping"));
         services.AddScoped<IStorageService, MinioStorageService>();
@@ -236,9 +241,11 @@ public class Program
 
         services.AddSingleton<Kernel>(_ => Kernel.CreateBuilder().Build());
         services.AddSingleton<ILLMProvider, SemanticKernelProvider>();
+        services.AddSingleton<ILLMRateLimiter, TenantRateLimiter>();
         services.AddScoped<IEmbeddingProvider, DeterministicEmbeddingProvider>();
         services.AddScoped<IVectorStore, PostgreSqlVectorStore>();
         services.AddSingleton<IEmbeddingCache, RedisEmbeddingCache>();
+        services.AddSingleton<ITextCache, RedisTextCache>();
         services.AddSingleton<IConnectionMultiplexer>(_ =>
         {
             var redisConfiguration = configuration.GetConnectionString("Redis")

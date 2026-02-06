@@ -19,25 +19,21 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, LLMOptions options, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
             {
                 // Simulate long-running operation
                 await Task.Delay(TimeSpan.FromSeconds(10), ct);
-                return new LLMResponse("result", 100, "model", TimeSpan.FromSeconds(10));
+                return new LLMResponse("result", model, "test-provider", 100, 0.001m, "completed", 0);
             });
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
-        var context = new AgentContext(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Test content",
-            new Dictionary<string, object>());
+        var context = CreateContext("Test content");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
@@ -49,22 +45,18 @@ public sealed class AgentTimeoutTests
         var callCount = 0;
 
         mockProvider
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
             .Callback(() => callCount++)
-            .ReturnsAsync(new LLMResponse("result", 100, "model", TimeSpan.FromMilliseconds(10)));
+            .ReturnsAsync(new LLMResponse("result", "gpt-4", "test-provider", 100, 0.001m, "completed", 0));
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
-        var context = new AgentContext(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Test content",
-            new Dictionary<string, object>());
+        var context = CreateContext("Test content");
 
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // Cancel immediately
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
 
         Assert.Equal(0, callCount); // Provider should not be called
@@ -76,8 +68,8 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, LLMOptions options, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
             {
                 // Check cancellation token during operation
                 for (int i = 0; i < 100; i++)
@@ -85,20 +77,16 @@ public sealed class AgentTimeoutTests
                     ct.ThrowIfCancellationRequested();
                     await Task.Delay(50, ct);
                 }
-                return new LLMResponse("result", 100, "model", TimeSpan.FromSeconds(5));
+                return new LLMResponse("result", model, "test-provider", 100, 0.001m, "completed", 0);
             });
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
-        var context = new AgentContext(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Test content",
-            new Dictionary<string, object>());
+        var context = CreateContext("Test content");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
@@ -108,15 +96,11 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LLMResponse("Summary result", 100, "model", TimeSpan.FromMilliseconds(50)));
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LLMResponse("Summary result", "gpt-4", "test-provider", 100, 0.001m, "completed", 0));
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
-        var context = new AgentContext(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Test content",
-            new Dictionary<string, object>());
+        var context = CreateContext("Test content");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -137,24 +121,20 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.GenerateAsync(It.IsAny<string>(), It.IsAny<LLMOptions>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, LLMOptions options, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
             {
                 await Task.Delay(timeoutMs + 50, ct); // Longer than timeout
-                return new LLMResponse("result", 100, "model", TimeSpan.FromMilliseconds(timeoutMs));
+                return new LLMResponse("result", model, "test-provider", 100, 0.001m, "completed", 0);
             });
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
-        var context = new AgentContext(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "Test content",
-            new Dictionary<string, object>());
+        var context = CreateContext("Test content");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
     }
 
@@ -186,9 +166,11 @@ public sealed class AgentTimeoutTests
 
             try
             {
-                var response = await _provider.GenerateAsync(
+                var response = await _provider.CallAsync(
                     $"Process: {context.ContentText}",
-                    new LLMOptions("gpt-4", 150, 0.7),
+                    "gpt-4",
+                    150,
+                    0.7f,
                     cancellationToken);
 
                 var payload = new Dictionary<string, object>
@@ -200,7 +182,7 @@ public sealed class AgentTimeoutTests
                     true,
                     response.Content,
                     new AgentResultData(Name, DateTimeOffset.UtcNow, payload),
-                    new AgentMetrics(response.TokenCount, 0.001m, response.Duration, 0, response.Model));
+                    new AgentMetrics(response.TokensUsed, response.CostEstimate, DateTimeOffset.UtcNow - startTime, response.RetryCount, response.Provider));
             }
             catch (OperationCanceledException)
             {
@@ -217,5 +199,18 @@ public sealed class AgentTimeoutTests
                     new List<string> { ex.Message });
             }
         }
+    }
+
+    private static AgentContext CreateContext(string contentText)
+    {
+        return new AgentContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            contentText,
+            new AgentContextMetadata(
+                "test",
+                100,
+                DateTimeOffset.UtcNow,
+                new Dictionary<string, object>()));
     }
 }

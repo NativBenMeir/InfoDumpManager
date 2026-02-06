@@ -13,6 +13,7 @@ namespace InfoDumpManager.Tests.Unit.AIAgents;
 public sealed class ValidationAgentTests
 {
     private readonly Mock<ILLMProvider> _mockLlmProvider;
+    private readonly Mock<ILLMRateLimiter> _mockRateLimiter;
     private readonly Mock<ICostManager> _mockCostManager;
     private readonly Mock<ILogger<ValidationAgent>> _mockLogger;
     private readonly ValidationAgent _agent;
@@ -20,9 +21,14 @@ public sealed class ValidationAgentTests
     public ValidationAgentTests()
     {
         _mockLlmProvider = new Mock<ILLMProvider>();
+        _mockRateLimiter = new Mock<ILLMRateLimiter>();
         _mockCostManager = new Mock<ICostManager>();
         _mockLogger = new Mock<ILogger<ValidationAgent>>();
-        _agent = new ValidationAgent(_mockLlmProvider.Object, _mockCostManager.Object, _mockLogger.Object);
+        _agent = new ValidationAgent(_mockLlmProvider.Object, _mockRateLimiter.Object, _mockCostManager.Object, _mockLogger.Object);
+
+        _mockRateLimiter
+            .Setup(x => x.ExecuteAsync(It.IsAny<Guid>(), It.IsAny<Func<CancellationToken, Task<LLMResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Guid, Func<CancellationToken, Task<LLMResponse>>, CancellationToken>((_, func, ct) => func(ct));
     }
 
     [Fact]

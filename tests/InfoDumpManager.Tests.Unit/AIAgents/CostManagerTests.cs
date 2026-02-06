@@ -158,9 +158,7 @@ public sealed class CostManagerTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var monthlyBudget = 100m;
         var currentUsage = 95m; // Very close to limit ($5 remaining)
-        var estimatedCostPerRequest = 0.02m; // $0.02 per request
         var estimatedTokens = 200; // Tokens that would cost $0.02
 
         _mockRepository
@@ -230,9 +228,8 @@ public sealed class CostManagerTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var monthlyBudget = 100m;
         var currentUsage = 98m; // $2 remaining
-        var largeRequestTokens = 10000; // Would cost ~$0.10 (exceeds remaining)
+        var largeRequestTokens = 500000; // Would cost ~$5.00 (exceeds remaining)
         var smallRequestTokens = 100; // Would cost ~$0.001 (within remaining)
 
         _mockRepository

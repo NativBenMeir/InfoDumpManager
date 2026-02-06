@@ -31,7 +31,7 @@ public sealed class CostTrackingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordUsageAsync_ShouldPersistToDatabase()
+    public void RecordUsageAsync_ShouldPersistToDatabase()
     {
         // This test verifies cost usage records are persisted correctly
         // Requires ICostUsageRepository and related entities
@@ -41,7 +41,7 @@ public sealed class CostTrackingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetMonthlyUsage_ShouldAggregateCorrectly()
+    public void GetMonthlyUsage_ShouldAggregateCorrectly()
     {
         // This test verifies monthly usage aggregation query
 
@@ -50,7 +50,7 @@ public sealed class CostTrackingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CostTracking_ShouldIsolateTenants()
+    public void CostTracking_ShouldIsolateTenants()
     {
         // This test verifies per-tenant usage isolation
 
@@ -59,7 +59,7 @@ public sealed class CostTrackingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CostReporting_ShouldSupportQueries()
+    public void CostReporting_ShouldSupportQueries()
     {
         // This test verifies cost reporting queries work
 

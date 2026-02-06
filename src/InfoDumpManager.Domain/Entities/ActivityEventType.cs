@@ -9,6 +9,8 @@ public enum ActivityEventType
     SummarizationCompleted,
     CategorizationSuggested,
     CategorizationAccepted,
+    TaggingSuggested,
+    ValidationCompleted,
     ActivityLogCreated,
     UserLoggedIn
 }

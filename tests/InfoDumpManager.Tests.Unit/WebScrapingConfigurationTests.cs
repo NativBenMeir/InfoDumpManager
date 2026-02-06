@@ -129,7 +129,7 @@ public sealed class MinioOptionsValidationTests
         // Arrange
         var options = Options.Create(new MinioOptions
         {
-            Endpoint = null,
+            Endpoint = null!,
             AccessKey = "key",
             SecretKey = "secret",
             BucketName = "bucket",
@@ -171,7 +171,7 @@ public sealed class MinioOptionsValidationTests
         var options = Options.Create(new MinioOptions
         {
             Endpoint = "localhost:9000",
-            AccessKey = null,
+            AccessKey = null!,
             SecretKey = "secret",
             BucketName = "bucket",
             UseSsl = false
@@ -193,7 +193,7 @@ public sealed class MinioOptionsValidationTests
         {
             Endpoint = "localhost:9000",
             AccessKey = "key",
-            SecretKey = null,
+            SecretKey = null!,
             BucketName = "bucket",
             UseSsl = false
         });
@@ -253,7 +253,7 @@ public sealed class MinioOptionsValidationTests
     public void MinioStorageService_WithNullOptions_Throws()
     {
         // Arrange
-        var options = Options.Create<MinioOptions>(null);
+        var options = Options.Create<MinioOptions>(null!);
 
         // Act
         var act = () => new MinioStorageService(options, NullLogger<MinioStorageService>.Instance);

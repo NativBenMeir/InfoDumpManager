@@ -49,6 +49,23 @@ public sealed record GEMCategorizationSuggested(
     DateTimeOffset OccurredAt) : IDomainEvent;
 
 /// <summary>
+/// Tag suggestion detail for event payload.
+/// </summary>
+public sealed record TagSuggestionDetail(
+    Guid TagId,
+    string TagName,
+    double SimilarityScore);
+
+/// <summary>
+/// Emitted when tags are suggested.
+/// </summary>
+public sealed record GEMTaggingSuggested(
+    Guid GEMId,
+    Guid TenantId,
+    IReadOnlyList<TagSuggestionDetail> Tags,
+    DateTimeOffset OccurredAt) : IDomainEvent;
+
+/// <summary>
 /// Emitted when processing completes.
 /// </summary>
 public sealed record GEMProcessingCompleted(

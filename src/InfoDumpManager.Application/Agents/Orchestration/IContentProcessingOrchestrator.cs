@@ -80,7 +80,7 @@ public enum ProcessingStatus
 /// <param name="Timeout">Optional processing timeout.</param>
 public sealed record ProcessingOptions(
     string Source = "web",
-    double AutoApproveThreshold = 0.7,
+    double AutoApproveThreshold = 0.8,
     bool RunValidation = true,
     int? MaxConcurrentJobs = null,
     TimeSpan? Timeout = null);

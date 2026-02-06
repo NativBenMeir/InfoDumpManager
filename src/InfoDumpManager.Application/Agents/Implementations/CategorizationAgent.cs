@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.Text.Json;
 using InfoDumpManager.Application.Services.CostManagement;
-using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Application.Services.LLM;
+using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
@@ -10,22 +12,25 @@ public sealed class CategorizationAgent : IAgent
 {
     private const string OperationName = "categorization";
 
-    private readonly IEmbeddingProvider _embeddingProvider;
-    private readonly IVectorStore _vectorStore;
     private readonly ILLMProvider _llmProvider;
+    private readonly ILLMRateLimiter _rateLimiter;
+    private readonly IGEMRepository _gemRepository;
+    private readonly ICategoryRepository _categoryRepository;
     private readonly ICostManager _costManager;
     private readonly ILogger<CategorizationAgent> _logger;
 
     public CategorizationAgent(
-        IEmbeddingProvider embeddingProvider,
-        IVectorStore vectorStore,
         ILLMProvider llmProvider,
+        ILLMRateLimiter rateLimiter,
+        IGEMRepository gemRepository,
+        ICategoryRepository categoryRepository,
         ICostManager costManager,
         ILogger<CategorizationAgent> logger)
     {
-        _embeddingProvider = embeddingProvider;
-        _vectorStore = vectorStore;
         _llmProvider = llmProvider;
+        _rateLimiter = rateLimiter;
+        _gemRepository = gemRepository;
+        _categoryRepository = categoryRepository;
         _costManager = costManager;
         _logger = logger;
     }
@@ -39,6 +44,16 @@ public sealed class CategorizationAgent : IAgent
         var stopwatch = Stopwatch.StartNew();
         try
         {
+            var gem = await _gemRepository.GetByIdAsync(context.GEMId).ConfigureAwait(false);
+            if (gem is null || gem.TenantId != context.TenantId)
+            {
+                return BuildFailure(context, "GEM not found for tenant.", stopwatch.Elapsed);
+            }
+
+            var categories = await _categoryRepository
+                .ListByTenantAsync(context.TenantId)
+                .ConfigureAwait(false);
+
             var embeddingBudget = await _costManager
                 .CanProcessAsync(context.TenantId, context.Metadata.EstimatedTokenCount, OperationName)
                 .ConfigureAwait(false);
@@ -48,32 +63,32 @@ public sealed class CategorizationAgent : IAgent
                 return BuildFailure(context, embeddingBudget.Message, stopwatch.Elapsed);
             }
 
-            var embedding = await _embeddingProvider
-                .GenerateEmbeddingAsync(context.ContentText, "text-embedding-3-large")
+            var content = string.IsNullOrWhiteSpace(gem.Summary.Text)
+                ? context.ContentText
+                : $"{gem.Title}\n{gem.Summary.Text}";
+
+            var prompt = BuildPrompt(content, categories);
+
+            var response = await _rateLimiter.ExecuteAsync(
+                    context.TenantId,
+                    ct => _llmProvider.CallAsync(prompt, "gpt-4", 220, 0.2f, ct),
+                    default)
                 .ConfigureAwait(false);
 
             await _costManager
-                .RecordUsageAsync(context.TenantId, context.GEMId, OperationName, embedding.TokensUsed, embedding.CostEstimate)
+                .RecordUsageAsync(context.TenantId, context.GEMId, OperationName, response.TokensUsed, response.CostEstimate)
                 .ConfigureAwait(false);
 
-            var searchResults = await _vectorStore
-                .SearchSimilarAsync(new EmbeddingSearchRequest(
-                    context.TenantId,
-                    "category",
-                    embedding.Vector,
-                    3))
-                .ConfigureAwait(false);
-
-            var suggestion = await SuggestCategoryAsync(context, searchResults).ConfigureAwait(false);
+            var suggestion = ResolveSuggestion(response.Content, categories);
             stopwatch.Stop();
 
             _logger.LogInformation(
                 "Categorization completed for GEM {GemId}. Tokens {TokensUsed}, Cost {Cost}, DurationMs {DurationMs}, Results {ResultCount}",
                 context.GEMId,
-                embedding.TokensUsed,
-                embedding.CostEstimate,
+                response.TokensUsed,
+                response.CostEstimate,
                 stopwatch.ElapsedMilliseconds,
-                searchResults.Count);
+                categories.Count);
 
             var requiresManualReview = suggestion.ShouldCreateNewCategory || suggestion.ConfidenceScore < 0.6;
 
@@ -87,15 +102,18 @@ public sealed class CategorizationAgent : IAgent
                     {
                         { "category", suggestion.SuggestedCategoryName ?? string.Empty },
                         { "suggestedCategory", suggestion.SuggestedCategoryName ?? string.Empty },
+                        { "suggestedCategoryId", suggestion.SuggestedCategoryId?.ToString() ?? string.Empty },
+                        { "proposedCategoryName", suggestion.ProposedCategoryName ?? string.Empty },
                         { "confidence", suggestion.ConfidenceScore },
-                        { "alternatives", suggestion.AlternativeMatches }
+                        { "alternatives", suggestion.AlternativeMatches },
+                        { "rationale", suggestion.Rationale ?? string.Empty }
                     }),
                 new AgentMetrics(
-                    embedding.TokensUsed,
-                    embedding.CostEstimate,
+                    response.TokensUsed,
+                    response.CostEstimate,
                     stopwatch.Elapsed,
-                    0,
-                    embedding.Provider),
+                    response.RetryCount,
+                    response.Provider),
                 null,
                 new AgentResultConfidence(
                     suggestion.ConfidenceScore,
@@ -113,59 +131,115 @@ public sealed class CategorizationAgent : IAgent
         string content,
         IEnumerable<CategoryOption> existingCategories)
     {
-        var options = new Dictionary<Guid, CategoryOption>(existingCategories.ToDictionary(x => x.Id));
-        return Task.FromResult(new CategorizationResult(
-            null,
-            null,
-            0.0,
-            options.Select(o => (o.Key, 0.0)).ToList(),
-            true));
-    }
-
-    private async Task<CategorizationResult> SuggestCategoryAsync(
-        AgentContext context,
-        IReadOnlyList<EmbeddingSearchResult> searchResults)
-    {
-        if (searchResults.Count == 0)
+        var options = existingCategories.ToList();
+        if (options.Count == 0)
         {
-            var prompt = $"Suggest a category name for the following content:\n\n{context.ContentText}";
-            var budgetCheck = await _costManager
-                .CanProcessAsync(context.TenantId, context.Metadata.EstimatedTokenCount, OperationName)
-                .ConfigureAwait(false);
-
-            if (!budgetCheck.Allowed)
-            {
-                return new CategorizationResult(null, null, 0.0, new List<(Guid, double)>(), true);
-            }
-
-            var response = await _llmProvider
-                .CallAsync(prompt, "gpt-4", 60, 0.2f)
-                .ConfigureAwait(false);
-
-            if (response is null)
-            {
-                return new CategorizationResult(null, null, 0.0, new List<(Guid, double)>(), true);
-            }
-
-            await _costManager.RecordUsageAsync(
-                context.TenantId,
-                context.GEMId,
-                OperationName,
-                response.TokensUsed,
-                response.CostEstimate)
-                .ConfigureAwait(false);
-
-            return new CategorizationResult(
+            return Task.FromResult(new CategorizationResult(
                 null,
-                response.Content.Trim(),
-                0.5,
+                "General",
+                "General",
+                0.4,
                 new List<(Guid, double)>(),
-                true);
+                true,
+                "No existing categories available."));
         }
 
-        var best = searchResults.First();
-        var alternatives = searchResults.Skip(1).Select(r => (r.SourceId, r.Distance)).ToList();
-        return new CategorizationResult(best.SourceId, best.Metadata, 1.0 / (1.0 + best.Distance), alternatives, false);
+        var selected = options[0];
+        return Task.FromResult(new CategorizationResult(
+            selected.Id,
+            selected.Name,
+            selected.Name,
+            0.5,
+            new List<(Guid, double)>(),
+            false,
+            "Fallback selection."));
+    }
+
+    private static string BuildPrompt(string content, IReadOnlyCollection<Category> categories)
+    {
+        var categoryList = categories.Count == 0
+            ? "(none)"
+            : string.Join("\n", categories.Select(c => $"- {c.Id}: {c.Name} | {c.Description}"));
+
+        return $@"Analyze this content and select the best category from the list, or propose a new category name.
+
+Content:
+{content}
+
+Categories:
+{categoryList}
+
+Return JSON with keys:
+{{
+    ""suggested_category_id"": ""guid-or-null"",
+    ""proposed_category_name"": ""name-or-null"",
+    ""confidence"": 0.0-1.0,
+    ""rationale"": ""short explanation""
+}}";
+    }
+
+    private static CategorizationResult ResolveSuggestion(string response, IReadOnlyCollection<Category> categories)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return BuildFallback(categories, "Empty LLM response.");
+        }
+
+        CategorySuggestionPayload? payload = null;
+        try
+        {
+            payload = JsonSerializer.Deserialize<CategorySuggestionPayload>(response);
+        }
+        catch
+        {
+            return BuildFallback(categories, "Invalid LLM response.");
+        }
+
+        if (payload is null)
+        {
+            return BuildFallback(categories, "Invalid LLM response.");
+        }
+
+        Guid? suggestedId = null;
+        if (!string.IsNullOrWhiteSpace(payload.SuggestedCategoryId)
+            && Guid.TryParse(payload.SuggestedCategoryId, out var parsed))
+        {
+            suggestedId = parsed;
+        }
+
+        var suggestedName = payload.ProposedCategoryName;
+        if (suggestedId.HasValue)
+        {
+            var category = categories.FirstOrDefault(c => c.Id == suggestedId);
+            if (category is not null)
+            {
+                suggestedName = category.Name;
+            }
+        }
+
+        var confidence = payload.Confidence.HasValue
+            ? Math.Clamp(payload.Confidence.Value, 0.0, 1.0)
+            : suggestedId.HasValue ? 0.75 : 0.55;
+
+        return new CategorizationResult(
+            suggestedId,
+            suggestedName,
+            payload.ProposedCategoryName,
+            confidence,
+            new List<(Guid, double)>(),
+            !suggestedId.HasValue,
+            payload.Rationale);
+    }
+
+    private static CategorizationResult BuildFallback(IReadOnlyCollection<Category> categories, string rationale)
+    {
+        var first = categories.FirstOrDefault();
+        if (first is null)
+        {
+            return new CategorizationResult(null, "General", "General", 0.4, new List<(Guid, double)>(), true, rationale);
+        }
+
+        return new CategorizationResult(first.Id, first.Name, first.Name, 0.55, new List<(Guid, double)>(), false, rationale);
     }
 
     private AgentResult BuildFailure(AgentContext context, string message, TimeSpan duration)
@@ -195,6 +269,14 @@ public sealed record CategoryOption(
 public sealed record CategorizationResult(
     Guid? SuggestedCategoryId,
     string? SuggestedCategoryName,
+    string? ProposedCategoryName,
     double ConfidenceScore,
     List<(Guid CategoryId, double SimilarityScore)> AlternativeMatches,
-    bool ShouldCreateNewCategory);
+    bool ShouldCreateNewCategory,
+    string? Rationale);
+
+internal sealed record CategorySuggestionPayload(
+    string? SuggestedCategoryId,
+    string? ProposedCategoryName,
+    double? Confidence,
+    string? Rationale);

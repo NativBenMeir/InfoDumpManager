@@ -82,7 +82,7 @@ public sealed class AIAgentsPipelineIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ProcessGEMAsync_ShouldCreateTags()
+    public void ProcessGEMAsync_ShouldCreateTags()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
@@ -95,7 +95,7 @@ public sealed class AIAgentsPipelineIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ProcessGEMAsync_ShouldPublishDomainEvents()
+    public void ProcessGEMAsync_ShouldPublishDomainEvents()
     {
         // Arrange
         var tenantId = Guid.NewGuid();

@@ -10,15 +10,18 @@ public sealed class ValidationAgent : IAgent
     private const string OperationName = "validation";
 
     private readonly ILLMProvider _llmProvider;
+    private readonly ILLMRateLimiter _rateLimiter;
     private readonly ICostManager _costManager;
     private readonly ILogger<ValidationAgent> _logger;
 
     public ValidationAgent(
         ILLMProvider llmProvider,
+        ILLMRateLimiter rateLimiter,
         ICostManager costManager,
         ILogger<ValidationAgent> logger)
     {
         _llmProvider = llmProvider;
+        _rateLimiter = rateLimiter;
         _costManager = costManager;
         _logger = logger;
     }
@@ -42,8 +45,10 @@ public sealed class ValidationAgent : IAgent
             }
 
             var prompt = $"Validate the quality and clarity of the following content. Return 'OK' if acceptable, or describe issues.\n\n{context.ContentText}";
-            var response = await _llmProvider
-                .CallAsync(prompt, "gpt-4", 80, 0.2f)
+            var response = await _rateLimiter.ExecuteAsync(
+                    context.TenantId,
+                    ct => _llmProvider.CallAsync(prompt, "gpt-4", 80, 0.2f, ct),
+                    default)
                 .ConfigureAwait(false);
 
             await _costManager.RecordUsageAsync(
