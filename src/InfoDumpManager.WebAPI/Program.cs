@@ -43,6 +43,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.SemanticKernel;
@@ -147,8 +148,12 @@ public class Program
             throw new InvalidOperationException("The default connection string is not configured.");
         }
 
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.UseVector();
+        var dataSource = dataSourceBuilder.Build();
+
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(connectionString, sql => {
+            options.UseNpgsql(dataSource, sql => {
                 sql.EnableRetryOnFailure();
                 sql.UseVector();
             }));

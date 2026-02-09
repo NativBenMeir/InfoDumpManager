@@ -3,7 +3,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
+using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Common.Services;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.GEMs.DTOs;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.Repositories;
@@ -18,17 +20,20 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
     private readonly ICurrentUserContext _currentUserContext;
     private readonly IMapper _mapper;
     private readonly IDatabasePolicy _databasePolicy;
+    private readonly IJobQueue<ProcessingJob> _jobQueue;
 
     public CreateGEMCommandHandler(
         IUnitOfWork unitOfWork,
         ICurrentUserContext currentUserContext,
         IMapper mapper,
-        IDatabasePolicy databasePolicy)
+        IDatabasePolicy databasePolicy,
+        IJobQueue<ProcessingJob> jobQueue)
     {
         _unitOfWork = unitOfWork;
         _currentUserContext = currentUserContext;
         _mapper = mapper;
         _databasePolicy = databasePolicy;
+        _jobQueue = jobQueue;
     }
 
     public async Task<GEMDto> Handle(CreateGEMCommand request, CancellationToken cancellationToken)
@@ -68,6 +73,18 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
         await _unitOfWork.ActivityLogs.AddAsync(activityLog, cancellationToken);
 
         await _databasePolicy.ExecuteAsync(() => _unitOfWork.SaveChangesAsync(cancellationToken), cancellationToken);
+
+        var job = new ProcessingJob(
+            Guid.NewGuid(),
+            gem.Id,
+            tenantId,
+            gem.Snapshot.HtmlContent,
+            new ProcessingOptions(Source: "create-gem"),
+            0,
+            DateTimeOffset.UtcNow,
+            null);
+
+        await _jobQueue.EnqueueAsync(job);
 
         return _mapper.Map<GEMDto>(gem);
     }

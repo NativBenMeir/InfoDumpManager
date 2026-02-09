@@ -4,6 +4,7 @@ using AutoMapper;
 using FluentAssertions;
 using InfoDumpManager.Application.Common.Services;
 using InfoDumpManager.Application.GEMs.Commands;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.Mappings;
 using InfoDumpManager.Infrastructure.Repositories;
 using InfoDumpManager.Infrastructure.Services;
@@ -57,7 +58,8 @@ public sealed class GemIngestionIntegrationTests
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
         var databasePolicy = new NoOpDatabasePolicy();
-        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy);
+        var jobQueue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
+        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
         var command = new CreateGEMCommand
         {

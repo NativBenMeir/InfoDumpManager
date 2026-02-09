@@ -1,6 +1,9 @@
 using InfoDumpManager.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Pgvector;
+using Pgvector.EntityFrameworkCore;
 
 namespace InfoDumpManager.Infrastructure.Data.Configurations;
 
@@ -46,5 +49,28 @@ public sealed class GEMConfiguration : IEntityTypeConfiguration<GEM>
             summary.Property(x => x.TokenCount).HasColumnName("SummaryTokenCount");
             summary.Property(x => x.GeneratedAt).HasColumnName("SummaryGeneratedAt");
         });
+
+        var floatArrayToVectorConverter = new ValueConverter<float[]?, Vector?>(
+            v => v == null ? null : new Vector(v),
+            v => v == null ? null : v.ToArray()
+        );
+
+        builder.Property(x => x.TitleEmbedding)
+            .HasColumnType("vector(1536)")
+            .IsRequired(false)
+            .HasConversion(floatArrayToVectorConverter);
+
+        builder.Property(x => x.SummaryEmbedding)
+            .HasColumnType("vector(1536)")
+            .IsRequired(false)
+            .HasConversion(floatArrayToVectorConverter);
+
+        builder.HasIndex(x => x.TitleEmbedding)
+            .HasMethod("hnsw")
+            .HasOperators("vector_cosine_ops");
+
+        builder.HasIndex(x => x.SummaryEmbedding)
+            .HasMethod("hnsw")
+            .HasOperators("vector_cosine_ops");
     }
 }

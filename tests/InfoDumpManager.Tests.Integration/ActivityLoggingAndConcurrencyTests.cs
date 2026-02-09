@@ -7,6 +7,7 @@ using FluentAssertions;
 using InfoDumpManager.Application.GEMs.Commands;
 using InfoDumpManager.Application.GEMs.DTOs;
 using InfoDumpManager.Application.GEMs.Queries;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.Mappings;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.ValueObjects;
@@ -51,8 +52,9 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
         var databasePolicy = new NoOpDatabasePolicy();
+        var jobQueue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
 
-        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy);
+        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
         var command = new CreateGEMCommand
         {
@@ -87,8 +89,9 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
         var databasePolicy = new NoOpDatabasePolicy();
+        var jobQueue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
 
-        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy);
+        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
         const string title = "Metadata Test GEM";
         const string url = "https://example.com/metadata-test";
@@ -126,8 +129,9 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
         var databasePolicy = new NoOpDatabasePolicy();
+        var jobQueue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
 
-        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy);
+        var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
         var command = new CreateGEMCommand
         {
@@ -222,6 +226,7 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
         var databasePolicy = new NoOpDatabasePolicy();
+        var jobQueue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
 
         // Act - Create 3 concurrent GEM creation tasks
         var tasks = Enumerable.Range(0, 3)
@@ -229,7 +234,7 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
             {
                 await using var context = _fixture.CreateContext();
                 await using var unitOfWork = new UnitOfWork(context);
-                var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy);
+                var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
                 var command = new CreateGEMCommand
                 {

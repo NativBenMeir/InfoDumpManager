@@ -20,6 +20,8 @@ public sealed class GEM : AggregateRoot<Guid>, ITenantEntity
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
+    public float[]? TitleEmbedding { get; private set; }
+    public float[]? SummaryEmbedding { get; private set; }
 
     private GEM()
     {
@@ -87,6 +89,20 @@ public sealed class GEM : AggregateRoot<Guid>, ITenantEntity
     public void UpdateTitle(string title)
     {
         Title = NormalizeTitle(title);
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void UpdateTitleEmbedding(float[] embedding)
+    {
+        if (embedding is null) throw new ArgumentNullException(nameof(embedding));
+        TitleEmbedding = embedding;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void UpdateSummaryEmbedding(float[] embedding)
+    {
+        if (embedding is null) throw new ArgumentNullException(nameof(embedding));
+        SummaryEmbedding = embedding;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

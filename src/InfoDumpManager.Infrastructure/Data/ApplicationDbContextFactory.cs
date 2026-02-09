@@ -4,6 +4,7 @@ using InfoDumpManager.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Pgvector.EntityFrameworkCore;
 
 namespace InfoDumpManager.Infrastructure.Data;
@@ -28,8 +29,12 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
                                ?? "Host=localhost;Database=InfoDumpManager;Username=postgres;Password=postgres;Pooling=false";
         }
 
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.UseVector();
+        var dataSource = dataSourceBuilder.Build();
+
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseNpgsql(connectionString, options => {
+        optionsBuilder.UseNpgsql(dataSource, options => {
             options.EnableRetryOnFailure();
             options.UseVector();
         });

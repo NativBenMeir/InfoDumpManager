@@ -6,6 +6,7 @@ using DotNet.Testcontainers.Configurations;
 using Testcontainers.PostgreSql;
 using InfoDumpManager.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Pgvector.EntityFrameworkCore;
 using Xunit;
 
@@ -21,6 +22,7 @@ public sealed class IntegrationTestCollection :
 public sealed class PostgresTestcontainerFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container;
+    private NpgsqlDataSource? _dataSource;
 
     public PostgresTestcontainerFixture()
     {
@@ -38,12 +40,13 @@ public sealed class PostgresTestcontainerFixture : IAsyncLifetime
 
     public ApplicationDbContext CreateContext()
     {
+        var dataSource = _dataSource ?? BuildDataSource();
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(ConnectionString, opts => {
+            .UseNpgsql(dataSource, opts => {
                 opts.EnableRetryOnFailure();
                 opts.UseVector();
             })
-            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .EnableSensitiveDataLogging()
             .Options;
 
@@ -81,14 +84,28 @@ public sealed class PostgresTestcontainerFixture : IAsyncLifetime
             await command.ExecuteNonQueryAsync();
             await connection.ReloadTypesAsync();
         }
+
+        _dataSource = BuildDataSource();
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync()
     {
+        if (_dataSource is not null)
+        {
+            await _dataSource.DisposeAsync();
+        }
+
         await _container.StopAsync();
         await _container.DisposeAsync();
+    }
+
+    private NpgsqlDataSource BuildDataSource()
+    {
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(ConnectionString);
+        dataSourceBuilder.UseVector();
+        return dataSourceBuilder.Build();
     }
 }
 

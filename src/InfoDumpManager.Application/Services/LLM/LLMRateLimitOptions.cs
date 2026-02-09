@@ -1,5 +1,7 @@
 namespace InfoDumpManager.Application.Services.LLM;
 
-public sealed record LLMRateLimitOptions(
-    int PermitLimitPerMinute = 60,
-    int QueueLimit = 0);
+public sealed class LLMRateLimitOptions
+{
+    public int PermitLimitPerMinute { get; init; } = 60;
+    public int QueueLimit { get; init; } = 0;
+}

@@ -21,6 +21,7 @@ using InfoDumpManager.Web.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
+using Npgsql;
 using Polly;
 using StackExchange.Redis;
 
@@ -37,8 +38,12 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("The default connection string is not configured.");
 }
 
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+dataSourceBuilder.UseVector();
+var dataSource = dataSourceBuilder.Build();
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString, sql => {
+    options.UseNpgsql(dataSource, sql => {
         sql.EnableRetryOnFailure();
         sql.UseVector();
     }));
