@@ -1,7 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Identity;
 
-namespace InfoDumpManager.Domain.Entities;
+namespace InfoDumpManager.Infrastructure.Data.Entities;
 
 public sealed class User : IdentityUser<Guid>
 {

@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Threading.Channels;
 using InfoDumpManager.Application.Agents;
 using InfoDumpManager.Application.Common.Events;
 using InfoDumpManager.Domain.Entities;
@@ -19,15 +17,16 @@ namespace InfoDumpManager.Application.Agents.Orchestration;
 public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrator
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ConcurrentDictionary<Guid, JobStatus> _jobStatuses = new();
-    private readonly ConcurrentDictionary<Guid, Channel<JobStatusUpdate>> _statusChannels = new();
+    private readonly IJobTracker _jobTracker;
     private readonly ILogger<ContentProcessingOrchestrator> _logger;
 
     public ContentProcessingOrchestrator(
         IServiceScopeFactory scopeFactory,
+        IJobTracker jobTracker,
         ILogger<ContentProcessingOrchestrator> logger)
     {
         _scopeFactory = scopeFactory;
+        _jobTracker = jobTracker;
         _logger = logger;
     }
 
@@ -46,7 +45,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
         AgentResult? validation = null;
         GEMSummary? summary = null;
 
-        UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 0, "Starting processing");
+        _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 0, "Starting processing");
 
         await using var scope = _scopeFactory.CreateAsyncScope();
         var agents = scope.ServiceProvider.GetServices<IAgent>().ToList();
@@ -63,7 +62,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 var validationAgent = ResolveAgent(agentMap, AgentCapability.Validation, errors);
                 if (validationAgent is null)
                 {
-                    UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 10, "Validation skipped (agent unavailable)");
+                    _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 10, "Validation skipped (agent unavailable)");
                 }
                 else
                 {
@@ -76,7 +75,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                     }
 
                     await LogValidationAsync(unitOfWork, tenantId, gemId, validation).ConfigureAwait(false);
-                    UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 15, "Validation complete");
+                    _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 15, "Validation complete");
                 }
             }
 
@@ -103,7 +102,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 summary?.Text ?? string.Empty,
                 summary?.TokenCount ?? 0,
                 DateTimeOffset.UtcNow)).ConfigureAwait(false);
-            UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 25, "Summarization complete");
+            _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 25, "Summarization complete");
 
             var categorizationAgent = ResolveAgent(agentMap, AgentCapability.Categorization, errors);
             if (categorizationAgent is not null)
@@ -121,7 +120,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 }
             }
 
-            UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 50, "Categorization complete");
+            _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 50, "Categorization complete");
 
             var taggingAgent = ResolveAgent(agentMap, AgentCapability.Tagging, errors);
             if (taggingAgent is not null)
@@ -138,9 +137,9 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
                 }
             }
 
-            UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 75, "Tagging complete");
+            _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Processing, 75, "Tagging complete");
 
-            UpdateStatus(resolvedJobId, ProcessingStatus.Completed, 100, "Processing complete");
+            _jobTracker.UpdateStatus(resolvedJobId, ProcessingStatus.Completed, 100, "Processing complete");
 
             return new ProcessingResult(
                 gemId,
@@ -199,20 +198,10 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
     }
 
     public Task<JobStatus> GetJobStatusAsync(Guid jobId)
-    {
-        if (_jobStatuses.TryGetValue(jobId, out var status))
-        {
-            return Task.FromResult(status);
-        }
-
-        return Task.FromResult(new JobStatus(jobId, ProcessingStatus.Pending, 0, "Pending", DateTimeOffset.UtcNow));
-    }
+        => _jobTracker.GetJobStatusAsync(jobId);
 
     public IAsyncEnumerable<JobStatusUpdate> WatchJobAsync(Guid jobId)
-    {
-        var channel = _statusChannels.GetOrAdd(jobId, _ => Channel.CreateUnbounded<JobStatusUpdate>());
-        return channel.Reader.ReadAllAsync();
-    }
+        => _jobTracker.WatchJobAsync(jobId);
 
     private AgentContext CreateContext(Guid gemId, Guid tenantId, string contentText, ProcessingOptions options)
     {
@@ -237,17 +226,6 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
 
         errors.Add($"Missing agent for capability '{capability}'.");
         return null;
-    }
-
-    private void UpdateStatus(Guid jobId, ProcessingStatus status, int progress, string message)
-    {
-        var snapshot = new JobStatus(jobId, status, progress, message, DateTimeOffset.UtcNow);
-        _jobStatuses.AddOrUpdate(jobId, snapshot, (_, _) => snapshot);
-
-        if (_statusChannels.TryGetValue(jobId, out var channel))
-        {
-            channel.Writer.TryWrite(new JobStatusUpdate(jobId, status, progress, message, DateTimeOffset.UtcNow));
-        }
     }
 
     private static int EstimateTokens(string text)
@@ -541,7 +519,7 @@ public sealed class ContentProcessingOrchestrator : IContentProcessingOrchestrat
         AgentResult? validation,
         List<string> errors)
     {
-        UpdateStatus(jobId, ProcessingStatus.Failed, 100, "Processing failed");
+        _jobTracker.UpdateStatus(jobId, ProcessingStatus.Failed, 100, "Processing failed");
 
         return new ProcessingResult(
             gemId,

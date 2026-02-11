@@ -1,27 +1,29 @@
 using System;
 using FluentValidation;
 using InfoDumpManager.Application.GEMs.Commands;
+using InfoDumpManager.Domain.Entities;
 
 namespace InfoDumpManager.Application.Validators;
 
 public sealed class CreateGEMCommandValidator : AbstractValidator<CreateGEMCommand>
 {
-    private const int MaxTitleLength = 256;
     private const int MaxMimeTypeLength = 64;
 
     public CreateGEMCommandValidator()
     {
         RuleFor(x => x.Title)
             .NotEmpty()
-            .MaximumLength(MaxTitleLength);
+            .MaximumLength(GEM.MaxTitleLength);
 
         RuleFor(x => x.Url)
             .NotEmpty()
+            .MaximumLength(GEM.MaxUrlLength)
             .Must(BeValidUri)
             .WithMessage("Url must be a valid absolute HTTP or HTTPS URI.");
 
         RuleFor(x => x.SourceUrl)
             .NotEmpty()
+            .MaximumLength(GEM.MaxUrlLength)
             .Must(BeValidUri)
             .WithMessage("Source URL must be a valid absolute HTTP or HTTPS URI.");
 

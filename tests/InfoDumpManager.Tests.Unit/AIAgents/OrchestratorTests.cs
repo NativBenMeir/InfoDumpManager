@@ -23,6 +23,7 @@ public sealed class ContentProcessingOrchestratorTests
     private readonly Mock<IActivityLogRepository> _mockActivityLogRepository;
     private readonly Mock<IMediator> _mockMediator;
     private readonly Mock<ILogger<ContentProcessingOrchestrator>> _mockLogger;
+    private readonly IJobTracker _jobTracker;
     private readonly List<IAgent> _agents;
     private readonly ContentProcessingOrchestrator _orchestrator;
 
@@ -36,6 +37,7 @@ public sealed class ContentProcessingOrchestratorTests
         _mockActivityLogRepository = new Mock<IActivityLogRepository>();
         _mockMediator = new Mock<IMediator>();
         _mockLogger = new Mock<ILogger<ContentProcessingOrchestrator>>();
+        _jobTracker = new InMemoryJobTracker();
 
         _mockGemRepository
             .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -365,7 +367,7 @@ public sealed class ContentProcessingOrchestratorTests
     {
         var provider = CreateServiceProvider(agents);
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        return new ContentProcessingOrchestrator(scopeFactory, _mockLogger.Object);
+        return new ContentProcessingOrchestrator(scopeFactory, _jobTracker, _mockLogger.Object);
     }
 
     private ServiceProvider CreateServiceProvider(IReadOnlyCollection<IAgent> agents)

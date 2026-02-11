@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using InfoDumpManager.Application.Common.Services;
 using Polly;
 
-namespace InfoDumpManager.Web.Services;
+namespace InfoDumpManager.Infrastructure.Services;
 
 public sealed class PollyDatabasePolicy : IDatabasePolicy
 {

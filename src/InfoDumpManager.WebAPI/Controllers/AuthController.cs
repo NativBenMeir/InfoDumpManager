@@ -1,6 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
-using InfoDumpManager.Domain.Entities;
+using UserEntity = InfoDumpManager.Infrastructure.Data.Entities.User;
 using InfoDumpManager.WebAPI.Contracts.Auth;
 using InfoDumpManager.WebAPI.Services;
 using Microsoft.AspNetCore.Http;
@@ -13,13 +13,13 @@ namespace InfoDumpManager.WebAPI.Controllers;
 [Route("api/v1/auth")]
 public sealed class AuthController : ControllerBase
 {
-    private readonly UserManager<User> _userManager;
-    private readonly SignInManager<User> _signInManager;
+    private readonly UserManager<UserEntity> _userManager;
+    private readonly SignInManager<UserEntity> _signInManager;
     private readonly ITokenService _tokenService;
 
     public AuthController(
-        UserManager<User> userManager,
-        SignInManager<User> signInManager,
+        UserManager<UserEntity> userManager,
+        SignInManager<UserEntity> signInManager,
         ITokenService tokenService)
     {
         _userManager = userManager;
@@ -30,7 +30,7 @@ public sealed class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var user = InfoDumpManager.Domain.Entities.User.Create(request.TenantId, request.UserName, request.Email, request.DisplayName);
+        var user = UserEntity.Create(request.TenantId, request.UserName, request.Email, request.DisplayName);
         var creationResult = await _userManager.CreateAsync(user, request.Password);
 
         if (!creationResult.Succeeded)

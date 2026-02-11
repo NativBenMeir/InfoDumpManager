@@ -11,6 +11,7 @@ using InfoDumpManager.Application.Infrastructure.JobQueue;
 using InfoDumpManager.Application.Mappings;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.ValueObjects;
+using InfoDumpManager.Infrastructure.Data;
 using InfoDumpManager.Infrastructure.Repositories;
 using InfoDumpManager.Infrastructure.Services;
 using InfoDumpManager.Tests.Integration.Fixtures;
@@ -47,7 +48,7 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var context = _fixture.CreateContext();
-        await using var unitOfWork = new UnitOfWork(context);
+        await using var unitOfWork = CreateUnitOfWork(context);
 
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
@@ -84,7 +85,7 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var context = _fixture.CreateContext();
-        await using var unitOfWork = new UnitOfWork(context);
+        await using var unitOfWork = CreateUnitOfWork(context);
 
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
@@ -124,7 +125,7 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var context = _fixture.CreateContext();
-        await using var unitOfWork = new UnitOfWork(context);
+        await using var unitOfWork = CreateUnitOfWork(context);
 
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
@@ -196,6 +197,17 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         var config = new MapperConfiguration(cfg => cfg.AddProfile(new GEMMappingProfile()));
         return config.CreateMapper();
     }
+
+    private static UnitOfWork CreateUnitOfWork(ApplicationDbContext context)
+    {
+        return new UnitOfWork(
+            context,
+            new GEMRepository(context),
+            new CategoryRepository(context),
+            new TagRepository(context),
+            new CategorySuggestionRepository(context),
+            new ActivityLogRepository(context));
+    }
 }
 
 /// <summary>
@@ -233,7 +245,7 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
             .Select(async i =>
             {
                 await using var context = _fixture.CreateContext();
-                await using var unitOfWork = new UnitOfWork(context);
+                await using var unitOfWork = CreateUnitOfWork(context);
                 var handler = new CreateGEMCommandHandler(unitOfWork, currentUser, mapper, databasePolicy, jobQueue);
 
                 var command = new CreateGEMCommand
@@ -267,7 +279,7 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
     {
         // Arrange
         await using var context = _fixture.CreateContext();
-        await using var unitOfWork = new UnitOfWork(context);
+        await using var unitOfWork = CreateUnitOfWork(context);
 
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();
@@ -287,7 +299,7 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
             .Select(async _ =>
             {
                 await using var queryContext = _fixture.CreateContext();
-                await using var queryUnitOfWork = new UnitOfWork(queryContext);
+                await using var queryUnitOfWork = CreateUnitOfWork(queryContext);
                 var handler = new GetGEMByIdQueryHandler(queryUnitOfWork, currentUser, mapper);
                 return await handler.Handle(new GetGEMByIdQuery { GemId = gem.Id }, default);
             })
@@ -308,5 +320,16 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
     {
         var config = new MapperConfiguration(cfg => cfg.AddProfile(new GEMMappingProfile()));
         return config.CreateMapper();
+    }
+
+    private static UnitOfWork CreateUnitOfWork(ApplicationDbContext context)
+    {
+        return new UnitOfWork(
+            context,
+            new GEMRepository(context),
+            new CategoryRepository(context),
+            new TagRepository(context),
+            new CategorySuggestionRepository(context),
+            new ActivityLogRepository(context));
     }
 }

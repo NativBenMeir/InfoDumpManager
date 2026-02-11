@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Infrastructure.JobQueue;
-using InfoDumpManager.Application.Services;
+using InfoDumpManager.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

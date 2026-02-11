@@ -1,4 +1,4 @@
-using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Infrastructure.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

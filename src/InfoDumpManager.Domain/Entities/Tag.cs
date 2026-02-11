@@ -5,7 +5,7 @@ namespace InfoDumpManager.Domain.Entities;
 
 public sealed class Tag : AggregateRoot<Guid>, ITenantEntity
 {
-    private const int MaxNameLength = 64;
+    public const int MaxNameLength = 64;
 
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = string.Empty;

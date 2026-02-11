@@ -1,7 +1,8 @@
 using System.Threading.Channels;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
 using Microsoft.Extensions.Logging;
 
-namespace InfoDumpManager.Application.Infrastructure.JobQueue;
+namespace InfoDumpManager.Infrastructure.Services;
 
 /// <summary>
 /// In-memory job queue for background processing.

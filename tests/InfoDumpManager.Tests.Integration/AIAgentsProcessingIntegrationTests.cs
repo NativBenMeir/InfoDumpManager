@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents;
 using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Infrastructure.JobQueue;
-using InfoDumpManager.Application.Services;
+using InfoDumpManager.Infrastructure.Services;
 using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.Repositories;
@@ -122,6 +122,11 @@ public sealed class AIAgentsProcessingIntegrationTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddScoped<ApplicationDbContext>(_ => _fixture.CreateContext());
+        services.AddScoped<IGEMRepository, GEMRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<ICategorySuggestionRepository, CategorySuggestionRepository>();
+        services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         var mediator = new Mock<IMediator>();
         mediator
@@ -137,8 +142,10 @@ public sealed class AIAgentsProcessingIntegrationTests : IAsyncLifetime
         services.AddScoped<IAgent>(_ => new TestAgent(AgentCapability.Validation, "Validation"));
 
         var provider = services.BuildServiceProvider();
+        var jobTracker = new InMemoryJobTracker();
         var orchestrator = new ContentProcessingOrchestrator(
             provider.GetRequiredService<IServiceScopeFactory>(),
+            jobTracker,
             Mock.Of<ILogger<ContentProcessingOrchestrator>>());
 
         // Act

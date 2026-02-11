@@ -6,8 +6,8 @@ namespace InfoDumpManager.Domain.Entities;
 
 public sealed class GEM : AggregateRoot<Guid>, ITenantEntity
 {
-    private const int MaxTitleLength = 256;
-    private const int MaxUrlLength = 2048;
+    public const int MaxTitleLength = 256;
+    public const int MaxUrlLength = 2048;
 
     public Guid TenantId { get; private set; }
     public string Title { get; private set; } = string.Empty;

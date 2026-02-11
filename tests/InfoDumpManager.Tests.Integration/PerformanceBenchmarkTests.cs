@@ -302,8 +302,10 @@ public sealed class PerformanceBenchmarkTests
             }
 
             var provider = services.BuildServiceProvider();
+            var jobTracker = new InMemoryJobTracker();
             return new ContentProcessingOrchestrator(
                 provider.GetRequiredService<IServiceScopeFactory>(),
+                jobTracker,
                 NullLogger<ContentProcessingOrchestrator>.Instance);
         }
 

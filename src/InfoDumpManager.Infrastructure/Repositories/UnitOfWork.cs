@@ -9,22 +9,28 @@ namespace InfoDumpManager.Infrastructure.Repositories;
 public sealed class UnitOfWork : IUnitOfWork
 {
     private readonly ApplicationDbContext _context;
-    private IGEMRepository? _gemRepository;
-    private ICategoryRepository? _categoryRepository;
-    private ITagRepository? _tagRepository;
-    private ICategorySuggestionRepository? _categorySuggestionRepository;
-    private IActivityLogRepository? _activityLogRepository;
 
-    public UnitOfWork(ApplicationDbContext context)
+    public UnitOfWork(
+        ApplicationDbContext context,
+        IGEMRepository gemRepository,
+        ICategoryRepository categoryRepository,
+        ITagRepository tagRepository,
+        ICategorySuggestionRepository categorySuggestionRepository,
+        IActivityLogRepository activityLogRepository)
     {
         _context = context;
+        GEMs = gemRepository;
+        Categories = categoryRepository;
+        Tags = tagRepository;
+        CategorySuggestions = categorySuggestionRepository;
+        ActivityLogs = activityLogRepository;
     }
 
-    public IGEMRepository GEMs => _gemRepository ??= new GEMRepository(_context);
-    public ICategoryRepository Categories => _categoryRepository ??= new CategoryRepository(_context);
-    public ITagRepository Tags => _tagRepository ??= new TagRepository(_context);
-    public ICategorySuggestionRepository CategorySuggestions => _categorySuggestionRepository ??= new CategorySuggestionRepository(_context);
-    public IActivityLogRepository ActivityLogs => _activityLogRepository ??= new ActivityLogRepository(_context);
+    public IGEMRepository GEMs { get; }
+    public ICategoryRepository Categories { get; }
+    public ITagRepository Tags { get; }
+    public ICategorySuggestionRepository CategorySuggestions { get; }
+    public IActivityLogRepository ActivityLogs { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => _context.SaveChangesAsync(cancellationToken);

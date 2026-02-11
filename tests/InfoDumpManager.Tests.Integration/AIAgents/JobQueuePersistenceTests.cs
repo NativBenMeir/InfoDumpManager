@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents.Orchestration;
 using InfoDumpManager.Application.Infrastructure.JobQueue;
+using InfoDumpManager.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;

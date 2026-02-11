@@ -6,8 +6,8 @@ namespace InfoDumpManager.Domain.Entities;
 
 public sealed class Category : AggregateRoot<Guid>, ITenantEntity
 {
-    private const int MaxNameLength = 128;
-    private const int MaxDescriptionLength = 512;
+    public const int MaxNameLength = 128;
+    public const int MaxDescriptionLength = 512;
     private readonly List<GEM> _gems = new();
 
     public Guid TenantId { get; private set; }

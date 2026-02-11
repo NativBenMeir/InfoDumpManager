@@ -38,6 +38,19 @@ public sealed class PostgresTestcontainerFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
+    public NpgsqlDataSource DataSource
+    {
+        get
+        {
+            if (_dataSource is null)
+            {
+                throw new InvalidOperationException("Postgres data source is not initialized.");
+            }
+
+            return _dataSource;
+        }
+    }
+
     public ApplicationDbContext CreateContext()
     {
         var dataSource = _dataSource ?? BuildDataSource();

@@ -25,7 +25,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Playwright;
-using Npgsql;
 using Xunit;
 
 namespace InfoDumpManager.Tests.Integration;
@@ -364,11 +363,8 @@ public sealed class WebUiIntegrationTests
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
-                var dataSourceBuilder = new NpgsqlDataSourceBuilder(_fixture.ConnectionString);
-                dataSourceBuilder.UseVector();
-                var dataSource = dataSourceBuilder.Build();
                 services.AddDbContext<ApplicationDbContext>(options =>
-                    options.UseNpgsql(dataSource, sql =>
+                    options.UseNpgsql(_fixture.DataSource, sql =>
                     {
                         sql.EnableRetryOnFailure();
                         sql.UseVector();

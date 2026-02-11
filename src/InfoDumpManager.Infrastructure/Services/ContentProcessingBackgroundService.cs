@@ -3,7 +3,7 @@ using InfoDumpManager.Application.Infrastructure.JobQueue;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace InfoDumpManager.Application.Services;
+namespace InfoDumpManager.Infrastructure.Services;
 
 /// <summary>
 /// Hosted service that drains the processing job queue.

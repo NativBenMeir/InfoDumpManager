@@ -53,7 +53,18 @@ public sealed class GemIngestionIntegrationTests
         var storedKey = await storageService.UploadSnapshotAsync(snapshotKey, scrapeResult.HtmlContent, scrapeResult.MimeType);
 
         await using var context = _postgresFixture.CreateContext();
-        await using var unitOfWork = new UnitOfWork(context);
+        var gemRepository = new GEMRepository(context);
+        var categoryRepository = new CategoryRepository(context);
+        var tagRepository = new TagRepository(context);
+        var categorySuggestionRepository = new CategorySuggestionRepository(context);
+        var activityLogRepository = new ActivityLogRepository(context);
+        await using var unitOfWork = new UnitOfWork(
+            context,
+            gemRepository,
+            categoryRepository,
+            tagRepository,
+            categorySuggestionRepository,
+            activityLogRepository);
 
         var mapper = CreateMapper();
         var currentUser = new TestCurrentUserContext();

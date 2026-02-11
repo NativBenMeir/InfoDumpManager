@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.ValueObjects;
+using InfoDumpManager.Infrastructure.Data;
 using InfoDumpManager.Infrastructure.Repositories;
 using InfoDumpManager.Tests.Integration.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,7 @@ public sealed class RepositoryIntegrationTests
         category.AddGem(gem);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(category);
             await unitOfWork.GEMs.AddAsync(gem);
@@ -61,7 +62,7 @@ public sealed class RepositoryIntegrationTests
         var category = Category.Create(tenantId, categoryName, createdBy, "Integration description");
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(category);
             await unitOfWork.SaveChangesAsync();
@@ -87,7 +88,7 @@ public sealed class RepositoryIntegrationTests
         var second = Category.Create(tenantId, categoryName, createdBy);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(first);
             await unitOfWork.Categories.AddAsync(second);
@@ -113,12 +114,11 @@ public sealed class RepositoryIntegrationTests
         var gem = GEM.Create(tenantId, "Unique GEM", url, source, snapshot);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.GEMs.AddAsync(gem);
             await unitOfWork.SaveChangesAsync();
         }
-
         await using (var verifyContext = _fixture.CreateContext())
         {
             var gemRepository = new GEMRepository(verifyContext);
@@ -140,7 +140,7 @@ public sealed class RepositoryIntegrationTests
         var gem2 = GEM.Create(tenant2, "Tenant2 GEM", "https://example.com/page2", source, snapshot);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.GEMs.AddAsync(gem1);
             await unitOfWork.GEMs.AddAsync(gem2);
@@ -172,7 +172,7 @@ public sealed class RepositoryIntegrationTests
         category.AddGem(gem2);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(category);
             await unitOfWork.GEMs.AddAsync(gem1);
@@ -201,7 +201,7 @@ public sealed class RepositoryIntegrationTests
         var gem = GEM.Create(tenantId, "Existing GEM", url, source, snapshot);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.GEMs.AddAsync(gem);
             await unitOfWork.SaveChangesAsync();
@@ -227,7 +227,7 @@ public sealed class RepositoryIntegrationTests
         var category = Category.Create(tenantId, categoryName, createdBy);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(category);
             await unitOfWork.SaveChangesAsync();
@@ -258,7 +258,7 @@ public sealed class RepositoryIntegrationTests
         var log3 = ActivityLog.Create(tenantId, ActivityEventType.GEMUpdated, "GEM", "Third log", userId: userId);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.ActivityLogs.AddAsync(log1);
             await unitOfWork.ActivityLogs.AddAsync(log2);
@@ -294,7 +294,7 @@ public sealed class RepositoryIntegrationTests
         category.AddGem(gem2);
 
         await using (var context = _fixture.CreateContext())
-        await using (var unitOfWork = new UnitOfWork(context))
+        await using (var unitOfWork = CreateUnitOfWork(context))
         {
             await unitOfWork.Categories.AddAsync(category);
             await unitOfWork.GEMs.AddAsync(gem1);
@@ -312,5 +312,16 @@ public sealed class RepositoryIntegrationTests
             categoryGems.Should().Contain(g => g.Title == "GEM2");
             categoryGems.Should().OnlyContain(g => g.Source.Title == "shared");
         }
+    }
+
+    private static UnitOfWork CreateUnitOfWork(ApplicationDbContext context)
+    {
+        return new UnitOfWork(
+            context,
+            new GEMRepository(context),
+            new CategoryRepository(context),
+            new TagRepository(context),
+            new CategorySuggestionRepository(context),
+            new ActivityLogRepository(context));
     }
 }

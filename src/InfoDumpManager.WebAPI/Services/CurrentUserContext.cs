@@ -1,4 +1,5 @@
 using System;
+using System.Security.Authentication;
 using InfoDumpManager.Application.Common.Services;
 using Microsoft.AspNetCore.Http;
 
@@ -27,6 +28,6 @@ public sealed class CurrentUserContext : ICurrentUserContext
             return parsed;
         }
 
-        throw new InvalidOperationException($"Missing or invalid {claimType} claim.");
+        throw new AuthenticationException($"Missing or invalid {claimType} claim.");
     }
 }

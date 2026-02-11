@@ -3,7 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
-using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Infrastructure.Data.Entities;
 using InfoDumpManager.WebAPI.Options;
 using Microsoft.IdentityModel.Tokens;
 
