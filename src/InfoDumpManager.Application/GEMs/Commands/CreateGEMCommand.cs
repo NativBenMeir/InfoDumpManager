@@ -4,7 +4,28 @@ using MediatR;
 
 namespace InfoDumpManager.Application.GEMs.Commands;
 
-public sealed class CreateGEMCommand : IRequest<GEMDto>
+public enum CreateGEMOnDuplicateMode
+{
+    Reject = 0,
+    UpdateExisting = 1,
+    CreateNewVersion = 2
+}
+
+public enum CreateGEMOutcome
+{
+    Created = 0,
+    DuplicateFound = 1,
+    UpdatedExisting = 2,
+    CreatedNewVersion = 3
+}
+
+public sealed record CreateGEMCommandResult(
+    CreateGEMOutcome Outcome,
+    GEMDto? Gem,
+    Guid? ExistingGemId,
+    string? Message);
+
+public sealed class CreateGEMCommand : IRequest<CreateGEMCommandResult>
 {
     public string Title { get; init; } = string.Empty;
 
@@ -27,4 +48,6 @@ public sealed class CreateGEMCommand : IRequest<GEMDto>
     public int SummaryTokenCount { get; init; }
 
     public DateTimeOffset? SummaryGeneratedAt { get; init; }
+
+    public CreateGEMOnDuplicateMode OnDuplicate { get; init; } = CreateGEMOnDuplicateMode.Reject;
 }

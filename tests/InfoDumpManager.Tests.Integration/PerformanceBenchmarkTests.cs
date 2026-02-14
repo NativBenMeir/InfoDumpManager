@@ -296,6 +296,8 @@ public sealed class PerformanceBenchmarkTests
             var services = new ServiceCollection();
             services.AddScoped<IUnitOfWork>(_ => unitOfWork.Object);
             services.AddScoped<IMediator>(_ => Mock.Of<IMediator>());
+            services.AddScoped<IProcessingPersistence, ProcessingPersistence>();
+            services.AddScoped<IProcessingActivityLogger, ProcessingActivityLogger>();
             foreach (var agent in agents)
             {
                 services.AddScoped<IAgent>(_ => agent);

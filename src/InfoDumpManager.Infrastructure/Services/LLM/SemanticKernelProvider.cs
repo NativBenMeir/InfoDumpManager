@@ -1,3 +1,4 @@
+using InfoDumpManager.Application.Common.Services;
 using InfoDumpManager.Application.Services.LLM;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -14,11 +15,14 @@ public sealed class SemanticKernelProvider : ILLMProvider
     private readonly ILogger<SemanticKernelProvider> _logger;
     private readonly IAsyncPolicy<LLMResponse> _policy;
 
-    public SemanticKernelProvider(Kernel kernel, ILogger<SemanticKernelProvider> logger)
+    public SemanticKernelProvider(
+        Kernel kernel,
+        IResiliencePolicyProvider resilienceProvider,
+        ILogger<SemanticKernelProvider> logger)
     {
         _kernel = kernel;
         _logger = logger;
-        _policy = BuildPolicy();
+        _policy = resilienceProvider.GetLLMPolicy<LLMResponse>();
     }
 
     public Task<LLMResponse> CallAsync(
@@ -66,29 +70,5 @@ public sealed class SemanticKernelProvider : ILLMProvider
             RetryCount: retryCount);
     }
 
-    private IAsyncPolicy<LLMResponse> BuildPolicy()
-    {
-        var retryPolicy = Policy<LLMResponse>
-            .Handle<Exception>()
-            .WaitAndRetryAsync(
-                3,
-                attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
-                (outcome, delay, attempt, _) =>
-                {
-                    if (outcome.Exception is not null)
-                    {
-                        _logger.LogWarning(outcome.Exception, "LLM retry attempt {Attempt} after {Delay}", attempt, delay);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("LLM retry attempt {Attempt} after {Delay}", attempt, delay);
-                    }
-                });
-
-        var circuitBreaker = Policy<LLMResponse>
-            .Handle<Exception>()
-            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
-
-        return Policy.WrapAsync(retryPolicy, circuitBreaker);
-    }
+    
 }

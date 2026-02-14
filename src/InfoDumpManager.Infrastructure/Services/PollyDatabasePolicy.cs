@@ -10,9 +10,9 @@ public sealed class PollyDatabasePolicy : IDatabasePolicy
 {
     private readonly IAsyncPolicy _policy;
 
-    public PollyDatabasePolicy(IAsyncPolicy policy)
+    public PollyDatabasePolicy(IResiliencePolicyProvider resilienceProvider)
     {
-        _policy = policy;
+        _policy = resilienceProvider.DatabasePolicy;
     }
 
     public Task ExecuteAsync(Func<Task> action, CancellationToken cancellationToken = default)

@@ -5,7 +5,6 @@ using System.Text.Json;
 using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
-using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -17,7 +16,6 @@ public sealed class SummarizationAgent : IAgent
 
     private readonly ILLMProvider _llmProvider;
     private readonly ILLMRateLimiter _rateLimiter;
-    private readonly IGEMRepository _gemRepository;
     private readonly ITextCache _textCache;
     private readonly ICostManager _costManager;
     private readonly ILogger<SummarizationAgent> _logger;
@@ -25,14 +23,12 @@ public sealed class SummarizationAgent : IAgent
     public SummarizationAgent(
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
-        IGEMRepository gemRepository,
         ITextCache textCache,
         ICostManager costManager,
         ILogger<SummarizationAgent> logger)
     {
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
-        _gemRepository = gemRepository;
         _textCache = textCache;
         _costManager = costManager;
         _logger = logger;
@@ -55,16 +51,14 @@ public sealed class SummarizationAgent : IAgent
 
     public async Task<AgentResult> ExecuteAsync(AgentContext context)
     {
-        var gem = await _gemRepository.GetByIdAsync(context.GEMId).ConfigureAwait(false);
-        if (gem is null || gem.TenantId != context.TenantId)
+        if (string.IsNullOrWhiteSpace(context.ContentText))
         {
-            return CreateFailureResult(context, "GEM not found for tenant.", TimeSpan.Zero, 0, 0m, "missing");
+            return CreateFailureResult(context, "No content provided for summarization.",
+                TimeSpan.Zero, 0, 0m, "no-content");
         }
 
         var options = new SummarizationOptions();
-        var content = string.IsNullOrWhiteSpace(context.ContentText)
-            ? BuildContentFromGem(gem)
-            : context.ContentText;
+        var content = context.ContentText;
 
         var cacheKey = BuildCacheKey(context.TenantId, content);
         var cached = await _textCache.TryGetAsync(cacheKey).ConfigureAwait(false);
@@ -225,9 +219,6 @@ public sealed class SummarizationAgent : IAgent
 
         return $"Summarize the following content in {lengthInstruction}.\n\n{content}";
     }
-
-    private static string BuildContentFromGem(InfoDumpManager.Domain.Entities.GEM gem)
-        => $"Title: {gem.Title}\n\n{gem.Snapshot.HtmlContent}";
 
     private static string BuildDeterministicSummary(string content)
     {

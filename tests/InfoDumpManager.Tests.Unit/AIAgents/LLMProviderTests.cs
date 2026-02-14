@@ -1,9 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
+using InfoDumpManager.Application.Common.Services;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Infrastructure.Services.LLM;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Moq;
+using Polly;
 using Xunit;
 
 namespace InfoDumpManager.Tests.Unit.AIAgents;
@@ -13,13 +15,18 @@ public sealed class SemanticKernelProviderTests
 {
     private readonly Kernel _kernel;
     private readonly Mock<ILogger<SemanticKernelProvider>> _mockLogger;
+    private readonly Mock<IResiliencePolicyProvider> _mockResilienceProvider;
     private readonly SemanticKernelProvider _provider;
 
     public SemanticKernelProviderTests()
     {
         _kernel = Kernel.CreateBuilder().Build();
         _mockLogger = new Mock<ILogger<SemanticKernelProvider>>();
-        _provider = new SemanticKernelProvider(_kernel, _mockLogger.Object);
+        _mockResilienceProvider = new Mock<IResiliencePolicyProvider>();
+        _mockResilienceProvider
+            .Setup(x => x.GetLLMPolicy<LLMResponse>())
+            .Returns(Policy.NoOpAsync<LLMResponse>());
+        _provider = new SemanticKernelProvider(_kernel, _mockResilienceProvider.Object, _mockLogger.Object);
     }
 
     [Fact]
@@ -115,7 +122,7 @@ public sealed class SemanticKernelProviderTests
     public void Constructor_ShouldInitializePollyPolicies()
     {
         // Arrange & Act
-        var provider = new SemanticKernelProvider(_kernel, _mockLogger.Object);
+        var provider = new SemanticKernelProvider(_kernel, _mockResilienceProvider.Object, _mockLogger.Object);
 
         // Assert
         Assert.NotNull(provider);

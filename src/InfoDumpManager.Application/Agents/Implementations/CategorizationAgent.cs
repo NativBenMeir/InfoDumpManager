@@ -3,7 +3,6 @@ using System.Text.Json;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Entities;
-using InfoDumpManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
@@ -14,23 +13,17 @@ public sealed class CategorizationAgent : IAgent
 
     private readonly ILLMProvider _llmProvider;
     private readonly ILLMRateLimiter _rateLimiter;
-    private readonly IGEMRepository _gemRepository;
-    private readonly ICategoryRepository _categoryRepository;
     private readonly ICostManager _costManager;
     private readonly ILogger<CategorizationAgent> _logger;
 
     public CategorizationAgent(
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
-        IGEMRepository gemRepository,
-        ICategoryRepository categoryRepository,
         ICostManager costManager,
         ILogger<CategorizationAgent> logger)
     {
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
-        _gemRepository = gemRepository;
-        _categoryRepository = categoryRepository;
         _costManager = costManager;
         _logger = logger;
     }
@@ -44,15 +37,16 @@ public sealed class CategorizationAgent : IAgent
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var gem = await _gemRepository.GetByIdAsync(context.GEMId).ConfigureAwait(false);
-            if (gem is null || gem.TenantId != context.TenantId)
+            IReadOnlyCollection<Category> categories;
+            if (context.Metadata.CustomData.TryGetValue("categories", out var catObj)
+                && catObj is IReadOnlyCollection<Category> loaded)
             {
-                return BuildFailure(context, "GEM not found for tenant.", stopwatch.Elapsed);
+                categories = loaded;
             }
-
-            var categories = await _categoryRepository
-                .ListByTenantAsync(context.TenantId)
-                .ConfigureAwait(false);
+            else
+            {
+                categories = Array.Empty<Category>();
+            }
 
             var embeddingBudget = await _costManager
                 .CanProcessAsync(context.TenantId, context.Metadata.EstimatedTokenCount, OperationName)
@@ -63,9 +57,7 @@ public sealed class CategorizationAgent : IAgent
                 return BuildFailure(context, embeddingBudget.Message, stopwatch.Elapsed);
             }
 
-            var content = string.IsNullOrWhiteSpace(gem.Summary.Text)
-                ? context.ContentText
-                : $"{gem.Title}\n{gem.Summary.Text}";
+            var content = context.ContentText;
 
             var prompt = BuildPrompt(content, categories);
 

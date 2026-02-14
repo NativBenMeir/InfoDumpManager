@@ -4,7 +4,7 @@ using InfoDumpManager.Domain.Common;
 
 namespace InfoDumpManager.Domain.Entities;
 
-public sealed class ActivityLog : AggregateRoot<Guid>, ITenantEntity
+public sealed class ActivityLog : AuditEntity<Guid>, ITenantEntity
 {
     public Guid TenantId { get; private set; }
     public ActivityEventType EventType { get; private set; }

@@ -4,9 +4,6 @@ using InfoDumpManager.Application.Agents.Implementations;
 using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
-using InfoDumpManager.Domain.Entities;
-using InfoDumpManager.Domain.Repositories;
-using InfoDumpManager.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -18,7 +15,6 @@ public sealed class SummarizationAgentTests
 {
     private readonly Mock<ILLMProvider> _mockLlmProvider;
     private readonly Mock<ILLMRateLimiter> _mockRateLimiter;
-    private readonly Mock<IGEMRepository> _mockGemRepository;
     private readonly Mock<ITextCache> _mockTextCache;
     private readonly Mock<ICostManager> _mockCostManager;
     private readonly Mock<ILogger<SummarizationAgent>> _mockLogger;
@@ -28,14 +24,12 @@ public sealed class SummarizationAgentTests
     {
         _mockLlmProvider = new Mock<ILLMProvider>();
         _mockRateLimiter = new Mock<ILLMRateLimiter>();
-        _mockGemRepository = new Mock<IGEMRepository>();
         _mockTextCache = new Mock<ITextCache>();
         _mockCostManager = new Mock<ICostManager>();
         _mockLogger = new Mock<ILogger<SummarizationAgent>>();
         _agent = new SummarizationAgent(
             _mockLlmProvider.Object,
             _mockRateLimiter.Object,
-            _mockGemRepository.Object,
             _mockTextCache.Object,
             _mockCostManager.Object,
             _mockLogger.Object);
@@ -72,13 +66,8 @@ public sealed class SummarizationAgentTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var gem = CreateGem(tenantId);
         var context = CreateTestContext(tenantId, "This is a long content that needs summarization.");
         var expectedSummary = "Summarized content";
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -104,12 +93,7 @@ public sealed class SummarizationAgentTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var gem = CreateGem(tenantId);
         var context = CreateTestContext(tenantId, "Content to summarize");
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -131,12 +115,7 @@ public sealed class SummarizationAgentTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var gem = CreateGem(tenantId);
         var context = CreateTestContext(tenantId, "Content to summarize");
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -173,13 +152,8 @@ public sealed class SummarizationAgentTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var gem = CreateGem(tenantId);
         var context = CreateTestContext(tenantId, "Content with specific token count");
         var expectedTokens = 42;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(gem);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -203,12 +177,7 @@ public sealed class SummarizationAgentTests
     {
         // Arrange
         var tenantId = Guid.NewGuid();
-        var gem = CreateGem(tenantId);
         var context = CreateTestContext(tenantId, "Content for cache");
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(gem);
 
         var cached = new
         {
@@ -244,12 +213,5 @@ public sealed class SummarizationAgentTests
                 100,
                 DateTimeOffset.UtcNow,
                 new Dictionary<string, object>()));
-    }
-
-    private static GEM CreateGem(Guid tenantId)
-    {
-        var source = new GEMSource("https://example.com", "Example");
-        var snapshot = new GEMSnapshot("<html>content</html>");
-        return GEM.Create(tenantId, "Title", "https://example.com/page", source, snapshot, GEMSummary.Empty);
     }
 }

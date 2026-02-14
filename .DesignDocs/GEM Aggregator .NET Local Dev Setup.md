@@ -49,7 +49,7 @@
 - `MINIO_ENDPOINT=http://localhost:9000`
 - `MINIO_ACCESS_KEY=minioadmin`
 - `MINIO_SECRET_KEY=minioadmin`
-- `OPENAI_API_KEY=...` (or Azure OpenAI vars)
+-`OPENAI_API_KEY=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`
 - `HANGFIRE_DASHBOARD_AUTH_DISABLED=true` (dev only)
 
 ## Docker Compose (snippet)

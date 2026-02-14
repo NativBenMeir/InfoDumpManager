@@ -18,9 +18,9 @@ using InfoDumpManager.Infrastructure.Services.LLM;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Npgsql;
-using Polly;
 using StackExchange.Redis;
 
 namespace InfoDumpManager.Infrastructure;
@@ -69,7 +69,32 @@ public static class DependencyInjection
         services.Configure<CostManagementOptions>(configuration.GetSection("CostManagement"));
 
         services.Configure<LLMRateLimitOptions>(configuration.GetSection("LLMRateLimit"));
-        services.AddSingleton<Kernel>(_ => Kernel.CreateBuilder().Build());
+        services.AddSingleton<Kernel>(sp =>
+        {
+            var builder = Kernel.CreateBuilder();
+            var config = sp.GetRequiredService<IConfiguration>();
+
+            var openAiKey = config["LLM:OpenAI:ApiKey"];
+            var azureEndpoint = config["LLM:AzureOpenAI:Endpoint"];
+            var azureKey = config["LLM:AzureOpenAI:ApiKey"];
+            var model = config["LLM:Model"] ?? "gpt-4";
+
+            if (!string.IsNullOrWhiteSpace(azureEndpoint) && !string.IsNullOrWhiteSpace(azureKey))
+            {
+                builder.AddAzureOpenAIChatCompletion(model, azureEndpoint, azureKey);
+            }
+            else if (!string.IsNullOrWhiteSpace(openAiKey))
+            {
+                builder.AddOpenAIChatCompletion(model, openAiKey);
+            }
+            else
+            {
+                var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("SemanticKernel");
+                logger.LogWarning("No LLM provider configured. Set LLM:OpenAI:ApiKey or LLM:AzureOpenAI:Endpoint + ApiKey.");
+            }
+
+            return builder.Build();
+        });
         services.AddSingleton<ILLMProvider, SemanticKernelProvider>();
         services.AddSingleton<ILLMRateLimiter, TenantRateLimiter>();
         services.AddScoped<IEmbeddingProvider, DeterministicEmbeddingProvider>();
@@ -95,20 +120,25 @@ public static class DependencyInjection
         services.AddScoped<IAgent, TaggingAgent>();
         services.AddScoped<IAgent, ValidationAgent>();
 
-        services.AddSingleton<IJobTracker, InMemoryJobTracker>();
-        services.AddSingleton<IJobQueue<ProcessingJob>, InMemoryJobQueue<ProcessingJob>>();
+        var useRedisJobs = configuration.GetValue<bool>("JobQueue:UseRedis", true);
+        if (useRedisJobs)
+        {
+            services.AddSingleton<IJobTracker, RedisJobTracker>();
+            services.AddSingleton<IJobQueue<ProcessingJob>, RedisJobQueue<ProcessingJob>>();
+        }
+        else
+        {
+            services.AddSingleton<IJobTracker, InMemoryJobTracker>();
+            services.AddSingleton<IJobQueue<ProcessingJob>, InMemoryJobQueue<ProcessingJob>>();
+        }
+
         services.AddSingleton<IContentProcessingOrchestrator, ContentProcessingOrchestrator>();
+        services.AddScoped<IProcessingPersistence, ProcessingPersistence>();
+        services.AddScoped<IProcessingActivityLogger, ProcessingActivityLogger>();
         services.AddHostedService<ContentProcessingBackgroundService>();
 
-        var retryPolicy = Policy.Handle<Exception>()
-            .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)));
-        var breakerPolicy = Policy.Handle<Exception>()
-            .CircuitBreakerAsync(2, TimeSpan.FromSeconds(30));
-        var databasePolicy = Policy.WrapAsync(retryPolicy, breakerPolicy);
-
-        services.AddSingleton<IAsyncPolicy>(databasePolicy);
-        services.AddSingleton<IDatabasePolicy>(sp =>
-            new PollyDatabasePolicy(sp.GetRequiredService<IAsyncPolicy>()));
+        services.AddSingleton<IResiliencePolicyProvider, PollyResiliencePolicyProvider>();
+        services.AddSingleton<IDatabasePolicy, PollyDatabasePolicy>();
 
         return services;
     }

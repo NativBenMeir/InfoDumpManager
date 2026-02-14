@@ -71,13 +71,15 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var gem = await handler.Handle(command, default);
+        var result = await handler.Handle(command, default);
         await context.SaveChangesAsync();
 
         // Assert - Verify GEM was created
-        gem.Should().NotBeNull();
-        gem.Title.Should().Be(command.Title);
-        gem.Url.Should().Be(command.Url);
+        result.Should().NotBeNull();
+        result.Outcome.Should().Be(CreateGEMOutcome.Created);
+        result.Gem.Should().NotBeNull();
+        result.Gem!.Title.Should().Be(command.Title);
+        result.Gem.Url.Should().Be(command.Url);
     }
 
     [Fact]
@@ -111,13 +113,15 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         };
 
         // Act
-        var gem = await handler.Handle(command, default);
+        var result = await handler.Handle(command, default);
         await context.SaveChangesAsync();
 
         // Assert - Verify GEM was created
-        gem.Should().NotBeNull();
-        gem.Title.Should().Be(title);
-        gem.Url.Should().Be(url);
+        result.Should().NotBeNull();
+        result.Outcome.Should().Be(CreateGEMOutcome.Created);
+        result.Gem.Should().NotBeNull();
+        result.Gem!.Title.Should().Be(title);
+        result.Gem.Url.Should().Be(url);
     }
 
     [Fact]
@@ -148,12 +152,14 @@ public sealed class ActivityLoggingIntegrationTests : IAsyncLifetime
         };
 
         // Act - Create GEM for current tenant
-        var gem = await handler.Handle(command, default);
+        var result = await handler.Handle(command, default);
         await context.SaveChangesAsync();
 
         // Assert - Verify GEM was created with correct tenant
-        gem.Should().NotBeNull();
-        gem.TenantId.Should().Be(currentUser.TenantId);
+        result.Should().NotBeNull();
+        result.Outcome.Should().Be(CreateGEMOutcome.Created);
+        result.Gem.Should().NotBeNull();
+        result.Gem!.TenantId.Should().Be(currentUser.TenantId);
     }
 
     [Fact]
@@ -261,9 +267,9 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
                     SummaryModel = ""
                 };
 
-                var gem = await handler.Handle(command, default);
+                var result = await handler.Handle(command, default);
                 await context.SaveChangesAsync();
-                return gem;
+                return result;
             })
             .ToList();
 
@@ -271,7 +277,12 @@ public sealed class ConcurrencyIntegrationTests : IAsyncLifetime
 
         // Assert - All tasks should succeed
         results.Should().HaveCount(3);
-        results.Should().AllSatisfy(gem => gem.Should().NotBeNull());
+        results.Should().AllSatisfy(result =>
+        {
+            result.Should().NotBeNull();
+            result.Outcome.Should().Be(CreateGEMOutcome.Created);
+            result.Gem.Should().NotBeNull();
+        });
     }
 
     [Fact]

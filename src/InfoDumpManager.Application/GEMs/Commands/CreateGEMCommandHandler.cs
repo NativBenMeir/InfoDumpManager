@@ -14,7 +14,7 @@ using MediatR;
 
 namespace InfoDumpManager.Application.GEMs.Commands;
 
-public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, GEMDto>
+public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, CreateGEMCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserContext _currentUserContext;
@@ -36,13 +36,38 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
         _jobQueue = jobQueue;
     }
 
-    public async Task<GEMDto> Handle(CreateGEMCommand request, CancellationToken cancellationToken)
+    public async Task<CreateGEMCommandResult> Handle(CreateGEMCommand request, CancellationToken cancellationToken)
     {
         var tenantId = _currentUserContext.TenantId;
 
-        if (await _unitOfWork.GEMs.ExistsByUrlAsync(tenantId, request.Url, cancellationToken))
+        var existingGem = await _unitOfWork.GEMs.GetByUrlAsync(tenantId, request.Url, cancellationToken);
+        if (existingGem is not null)
         {
-            throw new InvalidOperationException("A GEM with the same URL already exists for the tenant.");
+            var existingGemDto = _mapper.Map<GEMDto>(existingGem);
+
+            return request.OnDuplicate switch
+            {
+                CreateGEMOnDuplicateMode.Reject => new CreateGEMCommandResult(
+                    CreateGEMOutcome.DuplicateFound,
+                    existingGemDto,
+                    existingGem.Id,
+                    "A GEM with the same URL already exists for the tenant."),
+                CreateGEMOnDuplicateMode.UpdateExisting => new CreateGEMCommandResult(
+                    CreateGEMOutcome.DuplicateFound,
+                    existingGemDto,
+                    existingGem.Id,
+                    "A GEM with the same URL already exists. Update-existing behavior is not implemented yet."),
+                CreateGEMOnDuplicateMode.CreateNewVersion => new CreateGEMCommandResult(
+                    CreateGEMOutcome.DuplicateFound,
+                    existingGemDto,
+                    existingGem.Id,
+                    "A GEM with the same URL already exists. Create-new-version behavior is not implemented yet."),
+                _ => new CreateGEMCommandResult(
+                    CreateGEMOutcome.DuplicateFound,
+                    existingGemDto,
+                    existingGem.Id,
+                    "A GEM with the same URL already exists for the tenant.")
+            };
         }
 
         var source = new GEMSource(request.SourceUrl, request.SourceTitle);
@@ -86,7 +111,8 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
 
         await _jobQueue.EnqueueAsync(job);
 
-        return _mapper.Map<GEMDto>(gem);
+        var createdGem = _mapper.Map<GEMDto>(gem);
+        return new CreateGEMCommandResult(CreateGEMOutcome.Created, createdGem, null, null);
     }
 
     private static GEMSummary ResolveSummary(CreateGEMCommand request)

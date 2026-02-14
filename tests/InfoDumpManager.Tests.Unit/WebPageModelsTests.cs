@@ -51,7 +51,11 @@ public sealed class IndexPageModelTests
             .ReturnsAsync(scrapeResult);
 
         mediator.Setup(x => x.Send(It.IsAny<CreateGEMCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GEMDto { Id = gemId, Title = "Article Title", Url = scrapeResult.Url });
+            .ReturnsAsync(new CreateGEMCommandResult(
+                CreateGEMOutcome.Created,
+                new GEMDto { Id = gemId, Title = "Article Title", Url = scrapeResult.Url },
+                null,
+                null));
 
         var model = new IndexModel(logger.Object, mediator.Object, scraper.Object)
         {

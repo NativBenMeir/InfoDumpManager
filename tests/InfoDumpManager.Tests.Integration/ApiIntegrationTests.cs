@@ -101,9 +101,11 @@ public sealed class ApiIntegrationTests : IAsyncLifetime
         var response = await PostJsonAsync("/api/v1/gems", createRequest, auth.AccessToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var gem = await response.Content.ReadFromJsonAsync<GEMDto>();
-        gem.Should().NotBeNull();
-        gem!.Id.Should().NotBeEmpty();
+        var payload = await response.Content.ReadFromJsonAsync<CreateGemResponse>();
+        payload.Should().NotBeNull();
+        payload!.Outcome.Should().Be(CreateGemOutcome.Created);
+        payload.Gem.Should().NotBeNull();
+        payload.Gem!.Id.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -122,10 +124,11 @@ public sealed class ApiIntegrationTests : IAsyncLifetime
         var auth = await RegisterAndAuthenticateAsync();
         var createRequest = BuildCreateGemRequest();
         var createResponse = await PostJsonAsync("/api/v1/gems", createRequest, auth.AccessToken);
-        var createdGem = await createResponse.Content.ReadFromJsonAsync<GEMDto>();
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateGemResponse>();
 
-        createdGem.Should().NotBeNull();
-        var gemId = createdGem!.Id;
+        created.Should().NotBeNull();
+        created!.Gem.Should().NotBeNull();
+        var gemId = created.Gem!.Id;
 
         var getResponse = await GetAsync($"/api/v1/gems/{gemId}", auth.AccessToken);
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -204,7 +207,8 @@ public sealed class ApiIntegrationTests : IAsyncLifetime
         var auth = await RegisterAndAuthenticateAsync();
         var createGemRequest = BuildCreateGemRequest();
         var gemResponse = await PostJsonAsync("/api/v1/gems", createGemRequest, auth.AccessToken);
-        var gem = await gemResponse.Content.ReadFromJsonAsync<GEMDto>();
+        var createPayload = await gemResponse.Content.ReadFromJsonAsync<CreateGemResponse>();
+        var gem = createPayload?.Gem;
 
         var categoryResponse = await PostJsonAsync("/api/v1/categories", new CreateCategoryRequest
         {
@@ -219,6 +223,47 @@ public sealed class ApiIntegrationTests : IAsyncLifetime
         }, auth.AccessToken);
 
         assignResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task TEST_036_CreateGemWithDuplicateUrl_ReturnsConflictOutcome()
+    {
+        var auth = await RegisterAndAuthenticateAsync();
+        var request = BuildCreateGemRequest();
+
+        var first = await PostJsonAsync("/api/v1/gems", request, auth.AccessToken);
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = await PostJsonAsync("/api/v1/gems", request, auth.AccessToken);
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var payload = await second.Content.ReadFromJsonAsync<CreateGemResponse>();
+        payload.Should().NotBeNull();
+        payload!.Outcome.Should().Be(CreateGemOutcome.DuplicateFound);
+        payload.ExistingGemId.Should().NotBeNull();
+        payload.Gem.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task TEST_037_CreateGemWithDuplicateUrl_AndUpdateExistingMode_ReturnsDuplicateFoundWithModeMessage()
+    {
+        var auth = await RegisterAndAuthenticateAsync();
+        var request = BuildCreateGemRequest();
+
+        var first = await PostJsonAsync("/api/v1/gems", request, auth.AccessToken);
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        request.OnDuplicate = CreateGemOnDuplicateMode.UpdateExisting;
+        var second = await PostJsonAsync("/api/v1/gems", request, auth.AccessToken);
+
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var payload = await second.Content.ReadFromJsonAsync<CreateGemResponse>();
+        payload.Should().NotBeNull();
+        payload!.Outcome.Should().Be(CreateGemOutcome.DuplicateFound);
+        payload.ExistingGemId.Should().NotBeNull();
+        payload.Gem.Should().NotBeNull();
+        payload.Message.Should().Contain("Update-existing behavior is not implemented yet");
     }
 
     [Fact]

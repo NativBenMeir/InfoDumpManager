@@ -4,8 +4,6 @@ using InfoDumpManager.Application.Agents.Implementations;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Entities;
-using InfoDumpManager.Domain.Repositories;
-using InfoDumpManager.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -17,8 +15,6 @@ public sealed class CategorizationAgentTests
 {
     private readonly Mock<ILLMProvider> _mockLlmProvider;
     private readonly Mock<ILLMRateLimiter> _mockRateLimiter;
-    private readonly Mock<IGEMRepository> _mockGemRepository;
-    private readonly Mock<ICategoryRepository> _mockCategoryRepository;
     private readonly Mock<ICostManager> _mockCostManager;
     private readonly Mock<ILogger<CategorizationAgent>> _mockLogger;
     private readonly CategorizationAgent _agent;
@@ -27,16 +23,12 @@ public sealed class CategorizationAgentTests
     {
         _mockLlmProvider = new Mock<ILLMProvider>();
         _mockRateLimiter = new Mock<ILLMRateLimiter>();
-        _mockGemRepository = new Mock<IGEMRepository>();
-        _mockCategoryRepository = new Mock<ICategoryRepository>();
         _mockCostManager = new Mock<ICostManager>();
         _mockLogger = new Mock<ILogger<CategorizationAgent>>();
 
         _agent = new CategorizationAgent(
             _mockLlmProvider.Object,
             _mockRateLimiter.Object,
-            _mockGemRepository.Object,
-            _mockCategoryRepository.Object,
             _mockCostManager.Object,
             _mockLogger.Object);
 
@@ -63,17 +55,10 @@ public sealed class CategorizationAgentTests
     public async Task ExecuteAsync_WithHighConfidenceMatch_ShouldReturnSuccessWithCategory()
     {
         // Arrange
-        var context = CreateTestContext("Article about technology and AI");
         var categoryId = Guid.NewGuid();
-        var tenantId = context.TenantId;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateGem(tenantId));
-
-        _mockCategoryRepository
-            .Setup(x => x.ListByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { CreateCategory(tenantId, categoryId, "Technology") });
+        var tenantId = Guid.NewGuid();
+        var categories = new List<Category> { CreateCategory(tenantId, categoryId, "Technology") };
+        var context = CreateTestContextWithCategories(tenantId, "Article about technology and AI", categories);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -97,16 +82,9 @@ public sealed class CategorizationAgentTests
     public async Task ExecuteAsync_WithLowConfidence_ShouldFlagForManualReview()
     {
         // Arrange
-        var context = CreateTestContext("Ambiguous content");
-        var tenantId = context.TenantId;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateGem(tenantId));
-
-        _mockCategoryRepository
-            .Setup(x => x.ListByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") });
+        var tenantId = Guid.NewGuid();
+        var categories = new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") };
+        var context = CreateTestContextWithCategories(tenantId, "Ambiguous content", categories);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -129,16 +107,9 @@ public sealed class CategorizationAgentTests
     public async Task ExecuteAsync_WithLLMCall_ShouldUseRateLimiter()
     {
         // Arrange
-        var context = CreateTestContext("Content to categorize");
-        var tenantId = context.TenantId;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateGem(tenantId));
-
-        _mockCategoryRepository
-            .Setup(x => x.ListByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") });
+        var tenantId = Guid.NewGuid();
+        var categories = new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") };
+        var context = CreateTestContextWithCategories(tenantId, "Content to categorize", categories);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -161,16 +132,8 @@ public sealed class CategorizationAgentTests
     public async Task ExecuteAsync_WithNoMatchingCategories_ShouldReturnFallback()
     {
         // Arrange
-        var context = CreateTestContext("Uncategorizable content");
-        var tenantId = context.TenantId;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateGem(tenantId));
-
-        _mockCategoryRepository
-            .Setup(x => x.ListByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category>());
+        var tenantId = Guid.NewGuid();
+        var context = CreateTestContextWithCategories(tenantId, "Uncategorizable content", new List<Category>());
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -193,16 +156,9 @@ public sealed class CategorizationAgentTests
     public async Task ExecuteAsync_ShouldReturnFallbackWhenResponseInvalid()
     {
         // Arrange
-        var context = CreateTestContext("Content for embedding");
-        var tenantId = context.TenantId;
-
-        _mockGemRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateGem(tenantId));
-
-        _mockCategoryRepository
-            .Setup(x => x.ListByTenantAsync(tenantId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") });
+        var tenantId = Guid.NewGuid();
+        var categories = new List<Category> { CreateCategory(tenantId, Guid.NewGuid(), "General") };
+        var context = CreateTestContextWithCategories(tenantId, "Content for embedding", categories);
 
         _mockCostManager
             .Setup(x => x.CanProcessAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -232,17 +188,24 @@ public sealed class CategorizationAgentTests
                 new Dictionary<string, object>()));
     }
 
+    private static AgentContext CreateTestContextWithCategories(Guid tenantId, string contentText, IReadOnlyCollection<Category> categories)
+    {
+        var customData = new Dictionary<string, object> { ["categories"] = categories };
+        return new AgentContext(
+            Guid.NewGuid(),
+            tenantId,
+            contentText,
+            new AgentContextMetadata(
+                "test-source",
+                100,
+                DateTimeOffset.UtcNow,
+                customData));
+    }
+
     private static Category CreateCategory(Guid tenantId, Guid categoryId, string name)
     {
         var category = Category.Create(tenantId, name, Guid.NewGuid(), "desc");
         typeof(Category).GetProperty("Id")!.SetValue(category, categoryId);
         return category;
-    }
-
-    private static GEM CreateGem(Guid tenantId)
-    {
-        var source = new GEMSource("https://example.com", "Example");
-        var snapshot = new GEMSnapshot("<html>content</html>");
-        return GEM.Create(tenantId, "Title", "https://example.com/page", source, snapshot, GEMSummary.Empty);
     }
 }

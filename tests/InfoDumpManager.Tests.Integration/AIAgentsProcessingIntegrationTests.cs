@@ -140,6 +140,8 @@ public sealed class AIAgentsProcessingIntegrationTests : IAsyncLifetime
         services.AddScoped<IAgent>(_ => new TestAgent(AgentCapability.Categorization, "Categorization"));
         services.AddScoped<IAgent>(_ => new TestAgent(AgentCapability.Tagging, "Tagging"));
         services.AddScoped<IAgent>(_ => new TestAgent(AgentCapability.Validation, "Validation"));
+        services.AddScoped<IProcessingPersistence, ProcessingPersistence>();
+        services.AddScoped<IProcessingActivityLogger, ProcessingActivityLogger>();
 
         var provider = services.BuildServiceProvider();
         var jobTracker = new InMemoryJobTracker();

@@ -88,7 +88,9 @@ public sealed class GemIngestionIntegrationTests
         var created = await handler.Handle(command, default);
 
         created.Should().NotBeNull();
-        created.Url.Should().Be(scrapeResult.Url);
+        created.Outcome.Should().Be(CreateGEMOutcome.Created);
+        created.Gem.Should().NotBeNull();
+        created.Gem!.Url.Should().Be(scrapeResult.Url);
 
         var retrieved = await storageService.GetSnapshotAsync(storedKey);
         retrieved.Should().Be(scrapeResult.HtmlContent);

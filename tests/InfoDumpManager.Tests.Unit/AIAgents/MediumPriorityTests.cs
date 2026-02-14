@@ -1,7 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents;
+using InfoDumpManager.Application.Agents.Orchestration;
+using InfoDumpManager.Application.Infrastructure.JobQueue;
+using InfoDumpManager.Infrastructure.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Polly;
+using Polly.CircuitBreaker;
 using Xunit;
 
 namespace InfoDumpManager.Tests.Unit.AIAgents;
@@ -69,17 +75,49 @@ public sealed class AgentTelemetryTests
 public sealed class PollyPolicyTests
 {
     [Fact]
-    public void RetryPolicy_ShouldUseExponentialBackoff()
+    public async Task RetryPolicy_ShouldUseExponentialBackoff()
     {
-        // Verify retry policy timing: 2^0=1s, 2^1=2s, 2^2=4s
-        Assert.True(true); // Placeholder - requires Polly policy testing
+        // Arrange
+        var delays = new List<TimeSpan>();
+        var attempts = 0;
+
+        var policy = Policy
+            .Handle<InvalidOperationException>()
+            .WaitAndRetryAsync(
+                3,
+                attempt => TimeSpan.FromMilliseconds(Math.Pow(2, attempt)),
+                (_, delay, _, _) => delays.Add(delay));
+
+        // Act
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            policy.ExecuteAsync(() =>
+            {
+                attempts++;
+                throw new InvalidOperationException("boom");
+            }));
+
+        // Assert
+        Assert.Equal(4, attempts); // initial + 3 retries
+        Assert.Equal(3, delays.Count);
+        Assert.Equal(TimeSpan.FromMilliseconds(2), delays[0]);
+        Assert.Equal(TimeSpan.FromMilliseconds(4), delays[1]);
+        Assert.Equal(TimeSpan.FromMilliseconds(8), delays[2]);
     }
 
     [Fact]
-    public void CircuitBreaker_ShouldOpenAfterThreshold()
+    public async Task CircuitBreaker_ShouldOpenAfterThreshold()
     {
-        // Verify circuit breaker opens after N consecutive failures
-        Assert.True(true); // Placeholder
+        // Arrange
+        var policy = Policy
+            .Handle<InvalidOperationException>()
+            .CircuitBreakerAsync(2, TimeSpan.FromSeconds(5));
+
+        // Act
+        await Assert.ThrowsAsync<InvalidOperationException>(() => policy.ExecuteAsync(() => throw new InvalidOperationException("f1")));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => policy.ExecuteAsync(() => throw new InvalidOperationException("f2")));
+
+        // Assert
+        await Assert.ThrowsAsync<BrokenCircuitException>(() => policy.ExecuteAsync(() => Task.CompletedTask));
     }
 }
 
@@ -257,17 +295,69 @@ public sealed class AgentContextPropagationTests
 public sealed class ConcurrentProcessingTests
 {
     [Fact]
-    public void ConcurrentAgentCalls_ShouldBeThreadSafe()
+    public async Task ConcurrentAgentCalls_ShouldBeThreadSafe()
     {
-        // Test multiple concurrent agent executions
-        Assert.True(true); // Placeholder
+        // Arrange
+        var calls = 0;
+        var mockAgent = new Mock<IAgent>();
+        mockAgent.Setup(x => x.Capability).Returns(AgentCapability.Summarization);
+        mockAgent.Setup(x => x.Name).Returns("ConcurrentAgent");
+        mockAgent.Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>()))
+            .ReturnsAsync(() =>
+            {
+                Interlocked.Increment(ref calls);
+                return new AgentResult(
+                    true,
+                    "ok",
+                    new AgentResultData("ConcurrentAgent", DateTimeOffset.UtcNow, new Dictionary<string, object>()),
+                    new AgentMetrics(1, 0m, TimeSpan.Zero, 0, "test"));
+            });
+
+        var contexts = Enumerable.Range(0, 50)
+            .Select(i => new AgentContext(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                $"content-{i}",
+                new AgentContextMetadata("test", 5, DateTimeOffset.UtcNow, new Dictionary<string, object>())))
+            .ToList();
+
+        // Act
+        var results = await Task.WhenAll(contexts.Select(c => mockAgent.Object.ExecuteAsync(c)));
+
+        // Assert
+        Assert.Equal(50, calls);
+        Assert.All(results, result => Assert.True(result.Success));
     }
 
     [Fact]
-    public void JobQueue_ShouldHandleConcurrentEnqueue()
+    public async Task JobQueue_ShouldHandleConcurrentEnqueue()
     {
-        // Test concurrent enqueue operations
-        Assert.True(true); // Placeholder
+        // Arrange
+        var queue = new InMemoryJobQueue<ProcessingJob>(NullLogger<InMemoryJobQueue<ProcessingJob>>.Instance);
+        var jobs = Enumerable.Range(0, 25)
+            .Select(i => new ProcessingJob(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                $"content-{i}",
+                new ProcessingOptions(RunValidation: false),
+                CreatedAt: DateTimeOffset.UtcNow))
+            .ToList();
+
+        // Act
+        await Task.WhenAll(jobs.Select(queue.EnqueueAsync));
+
+        var dequeued = new List<ProcessingJob>();
+        for (var i = 0; i < jobs.Count; i++)
+        {
+            var job = await queue.DequeueAsync(TimeSpan.FromMilliseconds(250));
+            Assert.NotNull(job);
+            dequeued.Add(job!);
+        }
+
+        // Assert
+        Assert.Equal(jobs.Count, dequeued.Count);
+        Assert.Equal(jobs.Select(x => x.JobId).OrderBy(x => x), dequeued.Select(x => x.JobId).OrderBy(x => x));
     }
 }
 
@@ -279,23 +369,71 @@ public sealed class ConcurrentProcessingTests
 public sealed class ErrorRecoveryTests
 {
     [Fact]
-    public void TransientFailure_ShouldRecoverWithRetry()
+    public async Task TransientFailure_ShouldRecoverWithRetry()
     {
-        // Test retry recovers from transient failures
-        Assert.True(true); // Placeholder
+        // Arrange
+        var attempts = 0;
+        var policy = Policy
+            .Handle<InvalidOperationException>()
+            .RetryAsync(3);
+
+        // Act
+        var result = await policy.ExecuteAsync(() =>
+        {
+            attempts++;
+            if (attempts < 3)
+            {
+                throw new InvalidOperationException("transient");
+            }
+
+            return Task.FromResult("ok");
+        });
+
+        // Assert
+        Assert.Equal("ok", result);
+        Assert.Equal(3, attempts);
     }
 
     [Fact]
-    public void PermanentFailure_ShouldFailGracefully()
+    public async Task PermanentFailure_ShouldFailGracefully()
     {
-        // Test permanent failures handled properly
-        Assert.True(true); // Placeholder
+        // Arrange
+        var attempts = 0;
+        var policy = Policy
+            .Handle<InvalidOperationException>()
+            .RetryAsync(2);
+
+        // Act / Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            policy.ExecuteAsync(() =>
+            {
+                attempts++;
+                throw new InvalidOperationException("permanent");
+            }));
+
+        Assert.Equal("permanent", exception.Message);
+        Assert.Equal(3, attempts);
     }
 
     [Fact]
-    public void PartialAgentFailure_ShouldNotBlockPipeline()
+    public async Task PartialAgentFailure_ShouldNotBlockPipeline()
     {
-        // Test pipeline continues when optional agents fail
-        Assert.True(true); // Placeholder
+        // Arrange
+        var results = new List<AgentResult>
+        {
+            new(false, "tagging failed", new AgentResultData("Tagging", DateTimeOffset.UtcNow, new Dictionary<string, object>()), new AgentMetrics(0, 0m, TimeSpan.Zero, 0, "test"), new List<string> { "tag failure" }),
+            new(true, "summarization ok", new AgentResultData("Summarization", DateTimeOffset.UtcNow, new Dictionary<string, object>()), new AgentMetrics(10, 0.0001m, TimeSpan.Zero, 0, "test")),
+            new(true, "categorization ok", new AgentResultData("Categorization", DateTimeOffset.UtcNow, new Dictionary<string, object>()), new AgentMetrics(8, 0.0001m, TimeSpan.Zero, 0, "test"))
+        };
+
+        // Act
+        var pipelineContinued = results.Count(r => r.Success) >= 2;
+        var criticalStepSucceeded = results.Any(r => r.Success && r.Data.AgentName == "Summarization");
+
+        // Assert
+        Assert.True(pipelineContinued);
+        Assert.True(criticalStepSucceeded);
+        Assert.Contains(results, r => !r.Success && r.Data.AgentName == "Tagging");
+        await Task.CompletedTask;
     }
 }

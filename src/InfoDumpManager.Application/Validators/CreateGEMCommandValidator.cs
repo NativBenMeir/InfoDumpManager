@@ -37,6 +37,9 @@ public sealed class CreateGEMCommandValidator : AbstractValidator<CreateGEMComma
         RuleFor(x => x.SummaryTokenCount)
             .GreaterThanOrEqualTo(0);
 
+        RuleFor(x => x.OnDuplicate)
+            .IsInEnum();
+
         When(HasSummary, () =>
         {
             RuleFor(x => x.SummaryText).NotEmpty();

@@ -375,6 +375,8 @@ public sealed class ContentProcessingOrchestratorTests
         var services = new ServiceCollection();
         services.AddScoped<IUnitOfWork>(_ => _mockUnitOfWork.Object);
         services.AddScoped<IMediator>(_ => _mockMediator.Object);
+        services.AddScoped<IProcessingPersistence, ProcessingPersistence>();
+        services.AddScoped<IProcessingActivityLogger, ProcessingActivityLogger>();
 
         foreach (var agent in agents)
         {

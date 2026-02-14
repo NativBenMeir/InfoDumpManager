@@ -36,11 +36,27 @@ public sealed class GEMsController : ControllerBase
             SummaryText = request.SummaryText,
             SummaryModel = request.SummaryModel,
             SummaryTokenCount = request.SummaryTokenCount,
-            SummaryGeneratedAt = request.SummaryGeneratedAt
+            SummaryGeneratedAt = request.SummaryGeneratedAt,
+            OnDuplicate = (InfoDumpManager.Application.GEMs.Commands.CreateGEMOnDuplicateMode)request.OnDuplicate
         };
 
-        var gem = await _mediator.Send(command, cancellationToken);
-        return CreatedAtAction(nameof(GetById), new { id = gem.Id }, gem);
+        var result = await _mediator.Send(command, cancellationToken);
+        var response = new CreateGemResponse
+        {
+            Outcome = (Contracts.GEMs.CreateGemOutcome)result.Outcome,
+            Gem = result.Gem,
+            ExistingGemId = result.ExistingGemId,
+            Message = result.Message
+        };
+
+        return result.Outcome switch
+        {
+            InfoDumpManager.Application.GEMs.Commands.CreateGEMOutcome.Created => CreatedAtAction(nameof(GetById), new { id = result.Gem!.Id }, response),
+            InfoDumpManager.Application.GEMs.Commands.CreateGEMOutcome.DuplicateFound => Conflict(response),
+            InfoDumpManager.Application.GEMs.Commands.CreateGEMOutcome.UpdatedExisting => Ok(response),
+            InfoDumpManager.Application.GEMs.Commands.CreateGEMOutcome.CreatedNewVersion => CreatedAtAction(nameof(GetById), new { id = result.Gem!.Id }, response),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
     }
 
     [HttpGet("{id:guid}")]

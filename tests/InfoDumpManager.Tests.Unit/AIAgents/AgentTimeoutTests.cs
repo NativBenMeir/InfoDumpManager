@@ -124,18 +124,19 @@ public sealed class AgentTimeoutTests
             .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
             .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
             {
-                await Task.Delay(timeoutMs + 50, ct); // Longer than timeout
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
                 return new LLMResponse("result", model, "test-provider", 100, 0.001m, "completed", 0);
             });
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
         var context = CreateContext("Test content");
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        using var cts = new CancellationTokenSource();
+        var executeTask = agent.ExecuteWithCancellationAsync(context, cts.Token);
+        cts.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
 
         // Act & Assert
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await agent.ExecuteWithCancellationAsync(context, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => executeTask);
     }
 
     // Test helper class that supports cancellation

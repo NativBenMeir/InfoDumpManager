@@ -57,6 +57,7 @@ public class Program
         try
         {
             Log.Information("Starting InfoDumpManager WebAPI");
+            LoadDotEnv();
             var builder = WebApplication.CreateBuilder(args);
             
             builder.Host.UseSerilog();
@@ -97,6 +98,40 @@ public class Program
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", "InfoDumpManager.WebAPI")
             .CreateLogger();
+    }
+
+    private static void LoadDotEnv()
+    {
+        var basePath = Directory.GetCurrentDirectory();
+        var envPath = Path.Combine(basePath, ".env");
+        if (!File.Exists(envPath))
+        {
+            return;
+        }
+
+        foreach (var line in File.ReadAllLines(envPath))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var separatorIndex = trimmed.IndexOf('=');
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            var key = trimmed.Substring(0, separatorIndex).Trim();
+            var value = trimmed.Substring(separatorIndex + 1).Trim();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            Environment.SetEnvironmentVariable(key, value);
+        }
     }
 
     private static void ConfigureServices(IConfiguration configuration, IServiceCollection services)

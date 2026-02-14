@@ -1,12 +1,19 @@
 using System.Diagnostics.CodeAnalysis;
 using InfoDumpManager.Application.Agents;
 using InfoDumpManager.Application.Agents.Orchestration;
+using InfoDumpManager.Application.Common.Events;
 using InfoDumpManager.Domain.Entities;
+using InfoDumpManager.Domain.Events;
+using InfoDumpManager.Domain.Repositories;
 using InfoDumpManager.Domain.ValueObjects;
 using InfoDumpManager.Infrastructure.Data;
+using InfoDumpManager.Infrastructure.Repositories;
 using InfoDumpManager.Tests.Integration.Fixtures;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 namespace InfoDumpManager.Tests.Integration.AIAgents;
@@ -82,29 +89,159 @@ public sealed class AIAgentsPipelineIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public void ProcessGEMAsync_ShouldCreateTags()
+    public async Task ProcessGEMAsync_ShouldCreateTags()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
+        var gem = GEM.Create(
+            tenantId,
+            "Taggable GEM",
+            "https://example.com/tags",
+            new GEMSource("https://example.com/source", "source"),
+            new GEMSnapshot("tag content", "text/plain", DateTimeOffset.UtcNow));
 
-        // This test would verify tag creation and association
-        // through the complete AI pipeline
+        _dbContext.Gems.Add(gem);
+        await _dbContext.SaveChangesAsync();
+
+        var suggestedTags = new List<TagSuggestionResult>
+        {
+            new(Guid.NewGuid(), "ai", 0.91),
+            new(Guid.NewGuid(), "ml", 0.83)
+        };
+
+        var taggingResult = new AgentResult(
+            true,
+            "Tagging completed",
+            new AgentResultData(
+                "TaggingAgent",
+                DateTimeOffset.UtcNow,
+                new Dictionary<string, object>
+                {
+                    ["suggestedTags"] = suggestedTags,
+                    ["tags"] = suggestedTags.Select(x => x.TagName).ToList()
+                }),
+            new AgentMetrics(50, 0.0005m, TimeSpan.FromMilliseconds(10), 0, "test"));
+
+        var mediator = new Mock<IMediator>();
+        var persistence = new ProcessingPersistence(CreateUnitOfWork(), mediator.Object);
+
+        // Act
+        await persistence.HandleTaggingAsync(tenantId, gem.Id, taggingResult);
 
         // Assert
-        Assert.True(true); // Placeholder - requires full service configuration
+        var activityLog = await _dbContext.ActivityLogs
+            .Where(x => x.TenantId == tenantId && x.EntityId == gem.Id && x.EventType == ActivityEventType.TaggingSuggested)
+            .OrderByDescending(x => x.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(activityLog);
+        Assert.Contains("Tagging suggested", activityLog!.Description);
+
+        mediator.Verify(x => x.Publish(
+                It.Is<DomainEventNotification>(n =>
+                    n.Event != null
+                    && n.Event.GetType() == typeof(GEMTaggingSuggested)
+                    && ((GEMTaggingSuggested)n.Event).GEMId == gem.Id
+                    && ((GEMTaggingSuggested)n.Event).TenantId == tenantId
+                    && ((GEMTaggingSuggested)n.Event).Tags.Count == 2),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
     }
 
     [Fact]
-    public void ProcessGEMAsync_ShouldPublishDomainEvents()
+    public async Task ProcessGEMAsync_ShouldPublishDomainEvents()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
+        var gem = GEM.Create(
+            tenantId,
+            "Domain Event GEM",
+            "https://example.com/events",
+            new GEMSource("https://example.com/source", "source"),
+            new GEMSnapshot("pipeline content", "text/plain", DateTimeOffset.UtcNow));
 
-        // This test would verify domain events are published
-        // (GEMSummarizationStarted, GEMSummarizationCompleted, etc.)
+        _dbContext.Gems.Add(gem);
+        await _dbContext.SaveChangesAsync();
+
+        var mediator = new Mock<IMediator>();
+
+        var services = new ServiceCollection();
+        services.AddSingleton(mediator.Object);
+        services.AddScoped<IUnitOfWork>(_ => CreateUnitOfWork());
+        services.AddScoped<IProcessingPersistence, ProcessingPersistence>();
+        services.AddScoped<IProcessingActivityLogger, ProcessingActivityLogger>();
+        services.AddScoped<IAgent>(_ => new FakeSummarizationAgent());
+
+        var serviceProvider = services.BuildServiceProvider();
+        var orchestrator = new ContentProcessingOrchestrator(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InMemoryJobTracker(),
+            NullLogger<ContentProcessingOrchestrator>.Instance);
+
+        // Act
+        _ = await orchestrator.ProcessGEMAsync(
+            gem.Id,
+            tenantId,
+            "This is the content to summarize.",
+            new ProcessingOptions(RunValidation: false));
 
         // Assert
-        Assert.True(true); // Placeholder - requires event collection mechanism
+        mediator.Verify(x => x.Publish(
+                It.Is<DomainEventNotification>(n =>
+                    n.Event != null
+                    && n.Event.GetType() == typeof(GEMSummarizationCompleted)
+                    && ((GEMSummarizationCompleted)n.Event).GEMId == gem.Id
+                    && ((GEMSummarizationCompleted)n.Event).TenantId == tenantId
+                    && !string.IsNullOrWhiteSpace(((GEMSummarizationCompleted)n.Event).Summary)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        await using var verificationContext = _fixture.CreateContext();
+        var refreshedGem = await verificationContext.Gems.FindAsync(gem.Id);
+        Assert.NotNull(refreshedGem);
+        Assert.NotEqual(GEMSummary.Empty.Text, refreshedGem!.Summary.Text);
+    }
+
+    private UnitOfWork CreateUnitOfWork()
+    {
+        return new UnitOfWork(
+            _dbContext,
+            new GEMRepository(_dbContext),
+            new CategoryRepository(_dbContext),
+            new TagRepository(_dbContext),
+            new CategorySuggestionRepository(_dbContext),
+            new ActivityLogRepository(_dbContext));
+    }
+
+    private sealed class FakeSummarizationAgent : IAgent
+    {
+        public string Name => "FakeSummarizationAgent";
+
+        public AgentCapability Capability => AgentCapability.Summarization;
+
+        public Task<AgentResult> ExecuteAsync(AgentContext context)
+        {
+            var summary = GEMSummary.Create(
+                $"Summary for {context.GEMId}",
+                "fake-model",
+                42,
+                DateTimeOffset.UtcNow);
+
+            return Task.FromResult(new AgentResult(
+                true,
+                "ok",
+                new AgentResultData(
+                    Name,
+                    DateTimeOffset.UtcNow,
+                    new Dictionary<string, object>
+                    {
+                        ["summaryObject"] = summary,
+                        ["tokenCount"] = 42,
+                        ["model"] = "fake-model"
+                    }),
+                new AgentMetrics(42, 0.0001m, TimeSpan.FromMilliseconds(5), 0, "fake")));
+        }
     }
 
     [Fact]

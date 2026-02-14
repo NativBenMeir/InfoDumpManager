@@ -61,9 +61,25 @@ public class IndexModel : PageModel
                 SnapshotCapturedAt = scrape.CapturedAt
             };
 
-            var gem = await _mediator.Send(command, cancellationToken);
+            var result = await _mediator.Send(command, cancellationToken);
 
-            return RedirectToPage("/GEMs/Detail", new { id = gem.Id });
+            if (result.Outcome == CreateGEMOutcome.Created && result.Gem is not null)
+            {
+                return RedirectToPage("/GEMs/Detail", new { id = result.Gem.Id });
+            }
+
+            if (result.Outcome == CreateGEMOutcome.DuplicateFound)
+            {
+                var message = string.IsNullOrWhiteSpace(result.Message)
+                    ? "A GEM for this URL already exists. You can update the existing GEM or create a new GEM version when those options are enabled."
+                    : result.Message;
+
+                ModelState.AddModelError(string.Empty, message);
+                return Page();
+            }
+
+            ModelState.AddModelError(string.Empty, "Unable to submit this GEM right now. Please try again.");
+            return Page();
         }
         catch (Exception ex)
         {
