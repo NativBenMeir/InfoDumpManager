@@ -22,6 +22,8 @@ public sealed class GEMDto
 
     public string SnapshotHtml { get; init; } = string.Empty;
 
+    public string? SnapshotText { get; init; }
+
     public string SnapshotMimeType { get; init; } = string.Empty;
 
     public DateTimeOffset SnapshotCapturedAt { get; init; }

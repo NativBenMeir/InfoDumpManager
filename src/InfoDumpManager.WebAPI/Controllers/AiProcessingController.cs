@@ -44,8 +44,12 @@ public sealed class AiProcessingController : ControllerBase
             return NotFound();
         }
 
-        var contentText = string.IsNullOrWhiteSpace(request.ContentText)
+        var snapshotText = string.IsNullOrWhiteSpace(gem.Snapshot.TextContent)
             ? gem.Snapshot.HtmlContent
+            : gem.Snapshot.TextContent;
+
+        var contentText = string.IsNullOrWhiteSpace(request.ContentText)
+            ? snapshotText
             : request.ContentText;
 
         if (string.IsNullOrWhiteSpace(contentText))

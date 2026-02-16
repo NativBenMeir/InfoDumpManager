@@ -117,6 +117,7 @@ public static class DependencyInjection
         services.AddScoped<IStorageService, MinioStorageService>();
         services.Configure<WebScrapingOptions>(configuration.GetSection("WebScraping"));
         services.AddScoped<IWebScrapingService, WebScrapingService>();
+        services.AddScoped<IHtmlContentExtractor, AngleSharpHtmlContentExtractor>();
 
         services.AddScoped<IAgent, SummarizationAgent>();
         services.AddScoped<IAgent, CategorizationAgent>();

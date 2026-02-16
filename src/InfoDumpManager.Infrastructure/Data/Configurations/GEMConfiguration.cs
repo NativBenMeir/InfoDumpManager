@@ -38,6 +38,7 @@ public sealed class GEMConfiguration : IEntityTypeConfiguration<GEM>
         builder.OwnsOne(x => x.Snapshot, snapshot =>
         {
             snapshot.Property(x => x.HtmlContent).HasColumnName("SnapshotHtml").HasColumnType("text").IsRequired();
+            snapshot.Property(x => x.TextContent).HasColumnName("SnapshotText").HasColumnType("text").IsRequired(false);
             snapshot.Property(x => x.MimeType).HasColumnName("SnapshotMimeType").HasMaxLength(64).IsRequired();
             snapshot.Property(x => x.CapturedAt).HasColumnName("SnapshotCapturedAt").IsRequired();
         });

@@ -160,7 +160,7 @@ public sealed record WebScrapeResult(
 
 public sealed class WebScrapingOptions
 {
-    public int TimeoutSeconds { get; set; } = 30;
+    public int TimeoutSeconds { get; set; } = 10;
     public int RetryCount { get; set; } = 3;
     public int RetryBaseDelayMs { get; set; } = 250;
     public int CircuitBreakerFailures { get; set; } = 5;

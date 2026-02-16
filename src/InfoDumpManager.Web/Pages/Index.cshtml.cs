@@ -15,15 +15,18 @@ public class IndexModel : PageModel
     private readonly ILogger<IndexModel> _logger;
     private readonly IMediator _mediator;
     private readonly IWebScrapingService _webScrapingService;
+    private readonly IHtmlContentExtractor _htmlContentExtractor;
 
     public IndexModel(
         ILogger<IndexModel> logger,
         IMediator mediator,
-        IWebScrapingService webScrapingService)
+        IWebScrapingService webScrapingService,
+        IHtmlContentExtractor htmlContentExtractor)
     {
         _logger = logger;
         _mediator = mediator;
         _webScrapingService = webScrapingService;
+        _htmlContentExtractor = htmlContentExtractor;
     }
 
     [BindProperty]
@@ -48,6 +51,16 @@ public class IndexModel : PageModel
         {
             var scrape = await _webScrapingService.ScrapeAsync(SourceUrl, cancellationToken);
 
+            string? extractedText = null;
+            try
+            {
+                extractedText = _htmlContentExtractor.ExtractMainText(scrape.HtmlContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract main text for URL {Url}", scrape.Url);
+            }
+
             var title = string.IsNullOrWhiteSpace(scrape.Title) ? scrape.Url : scrape.Title;
 
             var command = new CreateGEMCommand
@@ -57,6 +70,7 @@ public class IndexModel : PageModel
                 SourceUrl = scrape.Url,
                 SourceTitle = scrape.Title,
                 SnapshotHtml = scrape.HtmlContent,
+                SnapshotText = extractedText,
                 SnapshotMimeType = scrape.MimeType,
                 SnapshotCapturedAt = scrape.CapturedAt
             };

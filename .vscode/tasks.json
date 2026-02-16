@@ -37,6 +37,126 @@
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "run-all-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-all-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-all-tests-verbose",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"-v",
+				"n"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-all-tests-trx",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"-v",
+				"n",
+				"--logger",
+				"trx;LogFileName=TestResults.trx",
+				"--results-directory",
+				"TestResults"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-unit-tests-verbose",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"tests/InfoDumpManager.Tests.Unit",
+				"-v",
+				"n"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-unit-tests-trx",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"tests/InfoDumpManager.Tests.Unit",
+				"-v",
+				"n",
+				"--logger",
+				"trx;LogFileName=UnitTests.trx",
+				"--results-directory",
+				"c:\\Code\\InfoDumpManager\\TestResults"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-integration-tests-verbose",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"tests/InfoDumpManager.Tests.Integration",
+				"-v",
+				"n"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-unit-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"tests/InfoDumpManager.Tests.Unit",
+				"-v",
+				"n",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"c:\\Code\\InfoDumpManager\\TestResults"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "run-all-tests-final",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"-v",
+				"n"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

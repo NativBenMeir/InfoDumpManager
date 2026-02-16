@@ -31,6 +31,7 @@ public sealed class GEMsController : ControllerBase
             SourceUrl = request.SourceUrl,
             SourceTitle = request.SourceTitle,
             SnapshotHtml = request.SnapshotHtml,
+            SnapshotText = request.SnapshotText,
             SnapshotMimeType = request.SnapshotMimeType,
             SnapshotCapturedAt = request.SnapshotCapturedAt,
             SummaryText = request.SummaryText,

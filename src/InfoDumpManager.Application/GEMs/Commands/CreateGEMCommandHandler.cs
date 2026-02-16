@@ -71,7 +71,11 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
         }
 
         var source = new GEMSource(request.SourceUrl, request.SourceTitle);
-        var snapshot = new GEMSnapshot(request.SnapshotHtml, request.SnapshotMimeType, request.SnapshotCapturedAt);
+        var snapshot = new GEMSnapshot(
+            request.SnapshotHtml,
+            request.SnapshotMimeType,
+            request.SnapshotCapturedAt,
+            request.SnapshotText);
         var summary = ResolveSummary(request);
 
         var gem = GEM.Create(tenantId, request.Title, request.Url, source, snapshot, summary);
@@ -99,11 +103,15 @@ public sealed class CreateGEMCommandHandler : IRequestHandler<CreateGEMCommand, 
 
         await _databasePolicy.ExecuteAsync(() => _unitOfWork.SaveChangesAsync(cancellationToken), cancellationToken);
 
+        var processingContent = string.IsNullOrWhiteSpace(snapshot.TextContent)
+            ? snapshot.HtmlContent
+            : snapshot.TextContent;
+
         var job = new ProcessingJob(
             Guid.NewGuid(),
             gem.Id,
             tenantId,
-            gem.Snapshot.HtmlContent,
+            processingContent,
             new ProcessingOptions(Source: "create-gem"),
             0,
             DateTimeOffset.UtcNow,

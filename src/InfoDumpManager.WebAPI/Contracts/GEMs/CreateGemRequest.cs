@@ -23,6 +23,8 @@ public sealed class CreateGemRequest
 
     public string SnapshotHtml { get; set; } = string.Empty;
 
+    public string? SnapshotText { get; set; }
+
     public string SnapshotMimeType { get; set; } = "text/html";
 
     public DateTimeOffset? SnapshotCapturedAt { get; set; }

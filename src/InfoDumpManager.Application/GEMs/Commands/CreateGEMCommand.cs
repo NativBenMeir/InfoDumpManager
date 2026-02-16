@@ -37,6 +37,8 @@ public sealed class CreateGEMCommand : IRequest<CreateGEMCommandResult>
 
     public string SnapshotHtml { get; init; } = string.Empty;
 
+    public string? SnapshotText { get; init; }
+
     public string SnapshotMimeType { get; init; } = "text/html";
 
     public DateTimeOffset? SnapshotCapturedAt { get; init; }

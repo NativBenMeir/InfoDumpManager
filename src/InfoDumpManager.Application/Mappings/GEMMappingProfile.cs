@@ -11,6 +11,7 @@ public sealed class GEMMappingProfile : Profile
     {
         CreateMap<GEM, GEMDto>()
             .ForMember(dest => dest.SnapshotHtml, opt => opt.MapFrom(src => src.Snapshot.HtmlContent))
+            .ForMember(dest => dest.SnapshotText, opt => opt.MapFrom(src => src.Snapshot.TextContent))
             .ForMember(dest => dest.SnapshotMimeType, opt => opt.MapFrom(src => src.Snapshot.MimeType))
             .ForMember(dest => dest.SnapshotCapturedAt, opt => opt.MapFrom(src => src.Snapshot.CapturedAt))
             .ForMember(dest => dest.SourceUrl, opt => opt.MapFrom(src => src.Source.Url))

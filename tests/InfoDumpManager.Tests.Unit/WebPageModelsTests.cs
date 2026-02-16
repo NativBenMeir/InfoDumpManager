@@ -38,6 +38,7 @@ public sealed class IndexPageModelTests
     {
         var mediator = new Mock<IMediator>();
         var scraper = new Mock<IWebScrapingService>();
+        var extractor = new Mock<IHtmlContentExtractor>();
         var logger = new Mock<ILogger<IndexModel>>();
         var gemId = Guid.NewGuid();
         var scrapeResult = new WebScrapeResult(
@@ -50,14 +51,17 @@ public sealed class IndexPageModelTests
         scraper.Setup(x => x.ScrapeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(scrapeResult);
 
-        mediator.Setup(x => x.Send(It.IsAny<CreateGEMCommand>(), It.IsAny<CancellationToken>()))
+        extractor.Setup(x => x.ExtractMainText(scrapeResult.HtmlContent))
+            .Returns("content");
+
+        mediator.Setup(x => x.Send(It.Is<CreateGEMCommand>(command => command.SnapshotText == "content"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CreateGEMCommandResult(
                 CreateGEMOutcome.Created,
                 new GEMDto { Id = gemId, Title = "Article Title", Url = scrapeResult.Url },
                 null,
                 null));
 
-        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object)
+        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object, extractor.Object)
         {
             SourceUrl = scrapeResult.Url,
             PageContext = BuildPageContext()
@@ -68,6 +72,8 @@ public sealed class IndexPageModelTests
         var redirect = result.Should().BeOfType<RedirectToPageResult>().Subject;
         redirect.PageName.Should().Be("/GEMs/Detail");
         redirect.RouteValues.Should().ContainKey("id");
+        extractor.Verify(x => x.ExtractMainText(scrapeResult.HtmlContent), Times.Once);
+        mediator.Verify(x => x.Send(It.Is<CreateGEMCommand>(command => command.SnapshotText == "content"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -75,12 +81,13 @@ public sealed class IndexPageModelTests
     {
         var mediator = new Mock<IMediator>();
         var scraper = new Mock<IWebScrapingService>();
+        var extractor = new Mock<IHtmlContentExtractor>();
         var logger = new Mock<ILogger<IndexModel>>();
 
         scraper.Setup(x => x.ScrapeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Failure"));
 
-        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object)
+        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object, extractor.Object)
         {
             SourceUrl = "https://example.com",
             PageContext = BuildPageContext()
@@ -97,9 +104,10 @@ public sealed class IndexPageModelTests
     {
         var mediator = new Mock<IMediator>();
         var scraper = new Mock<IWebScrapingService>();
+        var extractor = new Mock<IHtmlContentExtractor>();
         var logger = new Mock<ILogger<IndexModel>>();
 
-        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object)
+        var model = new IndexModel(logger.Object, mediator.Object, scraper.Object, extractor.Object)
         {
             SourceUrl = string.Empty,
             PageContext = BuildPageContext()
