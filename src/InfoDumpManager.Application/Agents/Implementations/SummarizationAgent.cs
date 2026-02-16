@@ -7,6 +7,7 @@ using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
 
@@ -19,18 +20,21 @@ public sealed class SummarizationAgent : IAgent
     private readonly ITextCache _textCache;
     private readonly ICostManager _costManager;
     private readonly ILogger<SummarizationAgent> _logger;
+    private readonly LlmEndpointSettings _chatSettings;
 
     public SummarizationAgent(
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
         ITextCache textCache,
         ICostManager costManager,
+        IOptions<AgentLlmSettings> llmSettings,
         ILogger<SummarizationAgent> logger)
     {
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
         _textCache = textCache;
         _costManager = costManager;
+        _chatSettings = llmSettings.Value.GetRequiredAgent(Name).Chat;
         _logger = logger;
     }
 
@@ -45,8 +49,8 @@ public sealed class SummarizationAgent : IAgent
             throw new ArgumentException("Content cannot be empty.", nameof(content));
         }
 
-        var prompt = BuildPrompt(content, options);
-        return ExecuteSummarizationAsync(prompt, options);
+        var promptTemplate = BuildPromptTemplate(options);
+        return ExecuteSummarizationAsync(content, promptTemplate, options);
     }
 
     public async Task<AgentResult> ExecuteAsync(AgentContext context)
@@ -100,14 +104,28 @@ public sealed class SummarizationAgent : IAgent
             }
         }
 
-        var prompt = BuildPrompt(content, options);
-        return await ExecuteSummarizationResultAsync(context, content, prompt, options).ConfigureAwait(false);
+        var promptTemplate = BuildPromptTemplate(options);
+        return await ExecuteSummarizationResultAsync(context, content, promptTemplate, options).ConfigureAwait(false);
     }
 
-    private async Task<SummarizationResult> ExecuteSummarizationAsync(string prompt, SummarizationOptions options)
+    private async Task<SummarizationResult> ExecuteSummarizationAsync(
+        string content,
+        string promptTemplate,
+        SummarizationOptions options)
     {
+        var promptVariables = new Dictionary<string, string>
+        {
+            ["content"] = content
+        };
+
         var response = await _llmProvider
-            .CallAsync(prompt, options.Model, options.MaxTokens, options.Temperature)
+            .CallAsync(
+                promptTemplate,
+                _chatSettings.Provider,
+                _chatSettings.Model,
+                options.MaxTokens,
+                options.Temperature,
+                promptVariables: promptVariables)
             .ConfigureAwait(false);
 
         return new SummarizationResult(
@@ -120,7 +138,7 @@ public sealed class SummarizationAgent : IAgent
     private async Task<AgentResult> ExecuteSummarizationResultAsync(
         AgentContext context,
         string content,
-        string prompt,
+        string promptTemplate,
         SummarizationOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -136,9 +154,21 @@ public sealed class SummarizationAgent : IAgent
 
         try
         {
+            var promptVariables = new Dictionary<string, string>
+            {
+                ["content"] = content
+            };
+
             var response = await _rateLimiter.ExecuteAsync(
                     context.TenantId,
-                    ct => _llmProvider.CallAsync(prompt, options.Model, options.MaxTokens, options.Temperature, ct),
+                    ct => _llmProvider.CallAsync(
+                        promptTemplate,
+                        _chatSettings.Provider,
+                        _chatSettings.Model,
+                        options.MaxTokens,
+                        options.Temperature,
+                        ct,
+                        promptVariables),
                     default)
                 .ConfigureAwait(false);
 
@@ -207,7 +237,7 @@ public sealed class SummarizationAgent : IAgent
         }
     }
 
-    private static string BuildPrompt(string content, SummarizationOptions options)
+    private static string BuildPromptTemplate(SummarizationOptions options)
     {
         var lengthInstruction = options.Length switch
         {
@@ -217,7 +247,7 @@ public sealed class SummarizationAgent : IAgent
             _ => "3-5 sentences"
         };
 
-        return $"Summarize the following content in {lengthInstruction}.\n\n{content}";
+        return $"Summarize the following content in {lengthInstruction}.\n\n" + "{{$content}}";
     }
 
     private static string BuildDeterministicSummary(string content)

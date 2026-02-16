@@ -71,6 +71,7 @@ public sealed class WebScrapingService : IWebScrapingService
         }).ConfigureAwait(false);
 
         var page = await context.NewPageAsync().ConfigureAwait(false);
+        var timeoutMs = Math.Max(_options.TimeoutSeconds, 1) * 1000;
 
         try
         {
@@ -81,9 +82,29 @@ public sealed class WebScrapingService : IWebScrapingService
                     normalizedUrl,
                     new PageGotoOptions
                     {
-                        WaitUntil = WaitUntilState.NetworkIdle,
-                        Timeout = _options.TimeoutSeconds * 1000
+                        WaitUntil = WaitUntilState.DOMContentLoaded,
+                        Timeout = timeoutMs
                     }).ConfigureAwait(false);
+
+                // Some modern pages keep background network activity open indefinitely
+                // (analytics/beacons/long-polling). Avoid failing a successful navigation
+                // purely because network never becomes fully idle.
+                try
+                {
+                    await page.WaitForLoadStateAsync(
+                        LoadState.NetworkIdle,
+                        new PageWaitForLoadStateOptions
+                        {
+                            Timeout = Math.Max(1000, timeoutMs / 3)
+                        }).ConfigureAwait(false);
+                }
+                catch (PlaywrightException ex) when (IsTimeoutException(ex))
+                {
+                    _logger.LogDebug(
+                        ex,
+                        "Network idle was not reached within the settle window for {Url}. Continuing with captured DOM.",
+                        normalizedUrl);
+                }
             }
             catch (PlaywrightException ex) when (IsTimeoutException(ex))
             {
@@ -139,7 +160,7 @@ public sealed record WebScrapeResult(
 
 public sealed class WebScrapingOptions
 {
-    public int TimeoutSeconds { get; set; } = 10;
+    public int TimeoutSeconds { get; set; } = 30;
     public int RetryCount { get; set; } = 3;
     public int RetryBaseDelayMs { get; set; } = 250;
     public int CircuitBreakerFailures { get; set; } = 5;

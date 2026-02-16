@@ -5,6 +5,7 @@ using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Entities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -30,6 +31,7 @@ public sealed class CategorizationAgentTests
             _mockLlmProvider.Object,
             _mockRateLimiter.Object,
             _mockCostManager.Object,
+            Options.Create(CreateLlmSettings()),
             _mockLogger.Object);
 
         _mockRateLimiter
@@ -65,7 +67,7 @@ public sealed class CategorizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse($"{{\"suggested_category_id\":\"{categoryId}\",\"proposed_category_name\":null,\"confidence\":0.85,\"rationale\":\"Matches tech\"}}", "gpt-4", "test", 20, 0.0001m, "completed", 0));
 
         // Act
@@ -91,7 +93,7 @@ public sealed class CategorizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("{\"suggested_category_id\":null,\"proposed_category_name\":\"Misc\",\"confidence\":0.4,\"rationale\":\"Ambiguous\"}", "gpt-4", "test", 20, 0.0001m, "completed", 0));
 
         // Act
@@ -116,7 +118,7 @@ public sealed class CategorizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("{\"suggested_category_id\":null,\"proposed_category_name\":\"General\",\"confidence\":0.5,\"rationale\":\"Fallback\"}", "gpt-4", "test", 10, 0.0001m, "completed", 0));
 
         // Act
@@ -140,7 +142,7 @@ public sealed class CategorizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse(string.Empty, "gpt-4", "test", 5, 0.0001m, "completed", 0));
 
         // Act
@@ -165,7 +167,7 @@ public sealed class CategorizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("not-json", "gpt-4", "test", 5, 0.0001m, "completed", 0));
 
         // Act
@@ -207,5 +209,20 @@ public sealed class CategorizationAgentTests
         var category = Category.Create(tenantId, name, Guid.NewGuid(), "desc");
         typeof(Category).GetProperty("Id")!.SetValue(category, categoryId);
         return category;
+    }
+
+    private static AgentLlmSettings CreateLlmSettings()
+    {
+        return new AgentLlmSettings
+        {
+            Agents = new Dictionary<string, AgentLlmAgentSettings>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["CategorizationAgent"] = new AgentLlmAgentSettings
+                {
+                    Chat = new LlmEndpointSettings { Provider = "OpenAI", Model = "gpt-4" },
+                    Embedding = new LlmEndpointSettings { Provider = "OpenAI", Model = "text-embedding-3-large" }
+                }
+            }
+        };
     }
 }

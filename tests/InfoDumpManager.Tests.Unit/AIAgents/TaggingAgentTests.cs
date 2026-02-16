@@ -8,6 +8,7 @@ using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Entities;
 using InfoDumpManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -48,6 +49,7 @@ public sealed class TaggingAgentTests
             _mockLlmProvider.Object,
             _mockRateLimiter.Object,
             _mockCostManager.Object,
+            Options.Create(CreateLlmSettings()),
             _mockLogger.Object);
 
         _mockEmbeddingCache
@@ -79,7 +81,7 @@ public sealed class TaggingAgentTests
             .Returns<Guid, Func<CancellationToken, Task<LLMResponse>>, CancellationToken>((_, func, ct) => func(ct));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("[]", "gpt-4", "test", 5, 0.0001m, "completed", 0));
     }
 
@@ -276,7 +278,7 @@ public sealed class TaggingAgentTests
             .ReturnsAsync(new EmbeddingResponse(new float[] { 0.1f }, "model", "openai", 5, 0.0001m));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("[\"llm-tag\",\"another\"]", "gpt-4", "test", 12, 0.0002m, "completed", 0));
 
         // Act
@@ -308,5 +310,20 @@ public sealed class TaggingAgentTests
         var tag = Tag.Create(tenantId, name, Guid.NewGuid());
         typeof(Tag).GetProperty("Id")!.SetValue(tag, tagId);
         return tag;
+    }
+
+    private static AgentLlmSettings CreateLlmSettings()
+    {
+        return new AgentLlmSettings
+        {
+            Agents = new Dictionary<string, AgentLlmAgentSettings>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["TaggingAgent"] = new AgentLlmAgentSettings
+                {
+                    Chat = new LlmEndpointSettings { Provider = "OpenAI", Model = "gpt-4" },
+                    Embedding = new LlmEndpointSettings { Provider = "OpenAI", Model = "text-embedding-3-large" }
+                }
+            }
+        };
     }
 }

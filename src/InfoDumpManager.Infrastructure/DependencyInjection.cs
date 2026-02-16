@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Npgsql;
 using StackExchange.Redis;
@@ -69,31 +70,33 @@ public static class DependencyInjection
         services.Configure<CostManagementOptions>(configuration.GetSection("CostManagement"));
 
         services.Configure<LLMRateLimitOptions>(configuration.GetSection("LLMRateLimit"));
-        services.AddSingleton<Kernel>(sp =>
+        services.AddOptions<AgentLlmSettings>()
+            .Bind(configuration.GetSection("LLM"));
+        services.AddSingleton<IValidateOptions<AgentLlmSettings>, AgentLlmSettingsValidator>();
+        services.AddOptions<AgentLlmSettings>()
+            .ValidateOnStart();
+
+        services.AddSingleton<IReadOnlyDictionary<string, Kernel>>(sp =>
         {
-            var builder = Kernel.CreateBuilder();
             var config = sp.GetRequiredService<IConfiguration>();
+            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("SemanticKernel");
+            var settings = sp.GetRequiredService<IOptions<AgentLlmSettings>>().Value;
 
-            var openAiKey = config["LLM:OpenAI:ApiKey"];
-            var azureEndpoint = config["LLM:AzureOpenAI:Endpoint"];
-            var azureKey = config["LLM:AzureOpenAI:ApiKey"];
-            var model = config["LLM:Model"] ?? "gpt-4";
+            var providers = settings.Agents
+                .SelectMany(x => new[] { x.Value.Chat.Provider, x.Value.Embedding.Provider })
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            if (!string.IsNullOrWhiteSpace(azureEndpoint) && !string.IsNullOrWhiteSpace(azureKey))
+            var kernels = new Dictionary<string, Kernel>(StringComparer.OrdinalIgnoreCase);
+            foreach (var provider in providers)
             {
-                builder.AddAzureOpenAIChatCompletion(model, azureEndpoint, azureKey);
-            }
-            else if (!string.IsNullOrWhiteSpace(openAiKey))
-            {
-                builder.AddOpenAIChatCompletion(model, openAiKey);
-            }
-            else
-            {
-                var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("SemanticKernel");
-                logger.LogWarning("No LLM provider configured. Set LLM:OpenAI:ApiKey or LLM:AzureOpenAI:Endpoint + ApiKey.");
+                var kernel = CreateKernelForProvider(provider, config);
+                kernels[provider] = kernel;
+                logger.LogInformation("Registered LLM provider kernel for {Provider}", provider);
             }
 
-            return builder.Build();
+            return kernels;
         });
         services.AddSingleton<ILLMProvider, SemanticKernelProvider>();
         services.AddSingleton<ILLMRateLimiter, TenantRateLimiter>();
@@ -141,5 +144,45 @@ public static class DependencyInjection
         services.AddSingleton<IDatabasePolicy, PollyDatabasePolicy>();
 
         return services;
+    }
+
+    private static Kernel CreateKernelForProvider(string provider, IConfiguration configuration)
+    {
+        var builder = Kernel.CreateBuilder();
+        var model = configuration["LLM:Model"];
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            throw new InvalidOperationException("LLM:Model must be configured.");
+        }
+
+        if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+        {
+            var openAiKey = configuration["LLM:OpenAI:ApiKey"];
+            if (string.IsNullOrWhiteSpace(openAiKey))
+            {
+                throw new InvalidOperationException("LLM:OpenAI:ApiKey must be configured when provider OpenAI is used.");
+            }
+
+            builder.AddOpenAIChatCompletion(model, openAiKey);
+            return builder.Build();
+        }
+
+        if (provider.Equals("AzureOpenAI", StringComparison.OrdinalIgnoreCase))
+        {
+            var azureEndpoint = configuration["LLM:AzureOpenAI:Endpoint"];
+            var azureKey = configuration["LLM:AzureOpenAI:ApiKey"];
+
+            if (string.IsNullOrWhiteSpace(azureEndpoint) || string.IsNullOrWhiteSpace(azureKey))
+            {
+                throw new InvalidOperationException(
+                    "LLM:AzureOpenAI:Endpoint and LLM:AzureOpenAI:ApiKey must be configured when provider AzureOpenAI is used.");
+            }
+
+            builder.AddAzureOpenAIChatCompletion(model, azureEndpoint, azureKey);
+            return builder.Build();
+        }
+
+        throw new InvalidOperationException($"Unsupported LLM provider '{provider}'. Supported values: OpenAI, AzureOpenAI.");
     }
 }

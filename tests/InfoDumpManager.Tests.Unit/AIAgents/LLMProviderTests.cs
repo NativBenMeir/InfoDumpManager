@@ -26,7 +26,11 @@ public sealed class SemanticKernelProviderTests
         _mockResilienceProvider
             .Setup(x => x.GetLLMPolicy<LLMResponse>())
             .Returns(Policy.NoOpAsync<LLMResponse>());
-        _provider = new SemanticKernelProvider(_kernel, _mockResilienceProvider.Object, _mockLogger.Object);
+        var kernels = new Dictionary<string, Kernel>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OpenAI"] = _kernel
+        };
+        _provider = new SemanticKernelProvider(kernels, _mockResilienceProvider.Object, _mockLogger.Object);
     }
 
     [Fact]
@@ -122,7 +126,11 @@ public sealed class SemanticKernelProviderTests
     public void Constructor_ShouldInitializePollyPolicies()
     {
         // Arrange & Act
-        var provider = new SemanticKernelProvider(_kernel, _mockResilienceProvider.Object, _mockLogger.Object);
+        var kernels = new Dictionary<string, Kernel>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OpenAI"] = _kernel
+        };
+        var provider = new SemanticKernelProvider(kernels, _mockResilienceProvider.Object, _mockLogger.Object);
 
         // Assert
         Assert.NotNull(provider);
@@ -138,11 +146,11 @@ public sealed class SemanticKernelProviderTests
         var mockFallback = new Mock<ILLMProvider>();
 
         mockPrimary
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .Throws(new HttpRequestException("Primary provider unavailable"));
 
         mockFallback
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(() =>
             {
                 callCount++;
@@ -153,18 +161,18 @@ public sealed class SemanticKernelProviderTests
         LLMResponse? response = null;
         try
         {
-            response = await mockPrimary.Object.CallAsync("test", "gpt-4", 100, 0.7f, CancellationToken.None);
+            response = await mockPrimary.Object.CallAsync("test", "gpt-4", 100, 0.7f, CancellationToken.None, null);
         }
         catch
         {
-            response = await mockFallback.Object.CallAsync("test", "gpt-3.5-turbo", 100, 0.7f, CancellationToken.None);
+            response = await mockFallback.Object.CallAsync("test", "gpt-3.5-turbo", 100, 0.7f, CancellationToken.None, null);
         }
 
         // Assert
         Assert.NotNull(response);
         Assert.Equal("Fallback result", response.Content);
         Assert.Equal(1, callCount);
-        mockFallback.Verify(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()), Times.Once);
+        mockFallback.Verify(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()), Times.Once);
     }
 
     [Fact]

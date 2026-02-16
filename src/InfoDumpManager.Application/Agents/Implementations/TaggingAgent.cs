@@ -9,6 +9,7 @@ using InfoDumpManager.Application.Services.Embeddings;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
 
@@ -32,6 +33,8 @@ public sealed class TaggingAgent : IAgent
     private readonly ILLMRateLimiter _rateLimiter;
     private readonly ICostManager _costManager;
     private readonly ILogger<TaggingAgent> _logger;
+    private readonly LlmEndpointSettings _chatSettings;
+    private readonly LlmEndpointSettings _embeddingSettings;
 
     public TaggingAgent(
         IEmbeddingProvider embeddingProvider,
@@ -42,6 +45,7 @@ public sealed class TaggingAgent : IAgent
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
         ICostManager costManager,
+        IOptions<AgentLlmSettings> llmSettings,
         ILogger<TaggingAgent> logger)
     {
         _embeddingProvider = embeddingProvider;
@@ -52,6 +56,9 @@ public sealed class TaggingAgent : IAgent
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
         _costManager = costManager;
+        var config = llmSettings.Value.GetRequiredAgent(Name);
+        _chatSettings = config.Chat;
+        _embeddingSettings = config.Embedding;
         _logger = logger;
     }
 
@@ -228,7 +235,7 @@ public sealed class TaggingAgent : IAgent
         try
         {
             var embedding = await _embeddingProvider
-                .GenerateEmbeddingAsync(context.ContentText, "text-embedding-3-large")
+                .GenerateEmbeddingAsync(context.ContentText, _embeddingSettings.Model)
                 .ConfigureAwait(false);
 
             await _embeddingCache.SetAsync(embeddingKey, embedding.Vector, TagCacheTtl).ConfigureAwait(false);
@@ -309,10 +316,15 @@ public sealed class TaggingAgent : IAgent
     {
         try
         {
-            var prompt = BuildTagPrompt(context.ContentText, candidates);
+            var promptTemplate = BuildTagPrompt(candidates);
+            var promptVariables = new Dictionary<string, string>
+            {
+                ["content"] = context.ContentText
+            };
+
             var response = await _rateLimiter.ExecuteAsync(
                     context.TenantId,
-                    ct => _llmProvider.CallAsync(prompt, "gpt-4", 120, 0.2f, ct),
+                    ct => _llmProvider.CallAsync(promptTemplate, _chatSettings.Provider, _chatSettings.Model, 120, 0.2f, ct, promptVariables),
                     default)
                 .ConfigureAwait(false);
 
@@ -501,7 +513,7 @@ public sealed class TaggingAgent : IAgent
         try
         {
             var embedding = await _embeddingProvider
-                .GenerateEmbeddingAsync(tag, "text-embedding-3-large")
+                .GenerateEmbeddingAsync(tag, _embeddingSettings.Model)
                 .ConfigureAwait(false);
 
             await _embeddingCache.SetAsync(embeddingKey, embedding.Vector, TagCacheTtl).ConfigureAwait(false);
@@ -578,18 +590,18 @@ public sealed class TaggingAgent : IAgent
         return trimmed.Trim();
     }
 
-    private static string BuildTagPrompt(string content, IReadOnlyList<TagSuggestionResult> candidates)
+    private static string BuildTagPrompt(IReadOnlyList<TagSuggestionResult> candidates)
     {
         var candidateBlock = candidates.Count == 0
             ? "(none)"
             : string.Join("\n", candidates.Select(c => $"- {c.TagId}: {c.TagName} (score {c.SimilarityScore:F2})"));
 
-        return $@"Select the most relevant tags for the content below.
+        return @"Select the most relevant tags for the content below.
 
 Use existing tags if they apply. Only propose new tags if none of the existing tags fit.
 
 Content:
-{content}
+" + "{{$content}}" + $@"
 
 Existing tag candidates:
 {candidateBlock}
@@ -621,7 +633,7 @@ Return JSON only with keys:
             try
             {
                 var embedding = await _embeddingProvider
-                    .GenerateEmbeddingAsync(tag.Name, "text-embedding-3-large")
+                    .GenerateEmbeddingAsync(tag.Name, _embeddingSettings.Model)
                     .ConfigureAwait(false);
 
                 if (embedding.Vector.Length == 0)

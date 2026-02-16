@@ -81,6 +81,12 @@ public class IndexModel : PageModel
             ModelState.AddModelError(string.Empty, "Unable to submit this GEM right now. Please try again.");
             return Page();
         }
+        catch (TimeoutException ex)
+        {
+            _logger.LogWarning(ex, "Web scraping timed out for URL {Url}", SourceUrl);
+            ModelState.AddModelError(string.Empty, "The source page took too long to respond. Please try again, or use a faster/reachable URL.");
+            return Page();
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to submit GEM for URL {Url}", SourceUrl);

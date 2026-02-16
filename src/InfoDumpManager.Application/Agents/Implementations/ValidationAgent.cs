@@ -2,6 +2,7 @@ using System.Diagnostics;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
 
@@ -13,16 +14,19 @@ public sealed class ValidationAgent : IAgent
     private readonly ILLMRateLimiter _rateLimiter;
     private readonly ICostManager _costManager;
     private readonly ILogger<ValidationAgent> _logger;
+    private readonly LlmEndpointSettings _chatSettings;
 
     public ValidationAgent(
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
         ICostManager costManager,
+        IOptions<AgentLlmSettings> llmSettings,
         ILogger<ValidationAgent> logger)
     {
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
         _costManager = costManager;
+        _chatSettings = llmSettings.Value.GetRequiredAgent(Name).Chat;
         _logger = logger;
     }
 
@@ -44,10 +48,15 @@ public sealed class ValidationAgent : IAgent
                 return BuildFailure(context, budgetCheck.Message, stopwatch.Elapsed);
             }
 
-            var prompt = $"Validate the quality and clarity of the following content. Return 'OK' if acceptable, or describe issues.\n\n{context.ContentText}";
+            const string promptTemplate = "Validate the quality and clarity of the following content. Return 'OK' if acceptable, or describe issues.\n\n{{$content}}";
+            var promptVariables = new Dictionary<string, string>
+            {
+                ["content"] = context.ContentText
+            };
+
             var response = await _rateLimiter.ExecuteAsync(
                     context.TenantId,
-                    ct => _llmProvider.CallAsync(prompt, "gpt-4", 80, 0.2f, ct),
+                    ct => _llmProvider.CallAsync(promptTemplate, _chatSettings.Provider, _chatSettings.Model, 80, 0.2f, ct, promptVariables),
                     default)
                 .ConfigureAwait(false);
 

@@ -18,7 +18,7 @@ namespace InfoDumpManager.Web.Pages.GEMs;
 
 public sealed class DetailModel : PageModel
 {
-    private readonly IMediator _mediator;
+private readonly IMediator _mediator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ICurrentUserContext _currentUserContext;

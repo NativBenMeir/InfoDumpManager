@@ -19,8 +19,8 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct, IReadOnlyDictionary<string, string>? promptVariables) =>
             {
                 // Simulate long-running operation
                 await Task.Delay(TimeSpan.FromSeconds(10), ct);
@@ -45,7 +45,7 @@ public sealed class AgentTimeoutTests
         var callCount = 0;
 
         mockProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .Callback(() => callCount++)
             .ReturnsAsync(new LLMResponse("result", "gpt-4", "test-provider", 100, 0.001m, "completed", 0));
 
@@ -68,8 +68,8 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct, IReadOnlyDictionary<string, string>? promptVariables) =>
             {
                 // Check cancellation token during operation
                 for (int i = 0; i < 100; i++)
@@ -96,7 +96,7 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("Summary result", "gpt-4", "test-provider", 100, 0.001m, "completed", 0));
 
         var agent = new TestTimeoutAgent(mockProvider.Object, AgentCapability.Summarization);
@@ -121,8 +121,8 @@ public sealed class AgentTimeoutTests
         // Arrange
         var mockProvider = new Mock<ILLMProvider>();
         mockProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct) =>
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
+            .Returns(async (string prompt, string model, int maxTokens, float temperature, CancellationToken ct, IReadOnlyDictionary<string, string>? promptVariables) =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
                 return new LLMResponse("result", model, "test-provider", 100, 0.001m, "completed", 0);

@@ -63,24 +63,27 @@ else
         <table class="table align-middle">
             <thead class="table-light">
                 <tr>
-                    <th scope="col">Title</th>
+                    <th scope="col" style="max-width: 250px;">Title</th>
+                    <th scope="col" style="max-width: 300px;">URL</th>
                     <th scope="col">Category</th>
                     <th scope="col">Created</th>
-                    <th scope="col" class="text-end">Actions</th>
+                    <th scope="col" class="text-end" style="width: 100px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var gem in Model.Gems)
                 {
                     <tr data-testid="gem-row">
-                        <td>
-                            <div class="fw-semibold">@gem.Title</div>
-                            <div class="text-muted small text-truncate">@gem.Url</div>
+                        <td class="text-truncate" title="@gem.Title" style="max-width: 250px;">
+                            <span class="fw-semibold">@gem.Title</span>
+                        </td>
+                        <td class="text-truncate" title="@gem.Url" style="max-width: 300px;">
+                            @gem.Url
                         </td>
                         <td>
-                            <span class="badge bg-light text-dark">@(gem.CategoryName ?? "Unassigned")</span>
+                            <span class="badge bg-light text-dark" title="@(gem.CategoryName ?? "Unassigned")">@(gem.CategoryName ?? "Unassigned")</span>
                         </td>
-                        <td>@gem.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                        <td title="@gem.CreatedAt.ToLocalTime().ToString("f")">@gem.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" asp-page="/GEMs/Detail" asp-route-id="@gem.Id">View</a>
                         </td>

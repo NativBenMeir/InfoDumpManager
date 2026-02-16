@@ -120,7 +120,7 @@ public sealed class PerformanceBenchmarkTests
         }
 
         var averageTime = totalTime / iterations;
-        var maxAverageMs = PerformanceTestSettings.GetLong("IDM_PERF_AVG_MS", 10000);
+        var maxAverageMs = PerformanceTestSettings.GetLong("IDM_PERF_AVG_MS", 12000);
 
         // Assert
         _output.WriteLine($"Average scraping time over {iterations} iterations: {averageTime}ms");

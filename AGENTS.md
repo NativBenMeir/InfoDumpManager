@@ -170,6 +170,10 @@ dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
 - Integration test coverage for database operations and external dependencies
 - Run coverage reports with coverlet: `dotnet test /p:CollectCoverage=true`
 
+### Running tests
+
+ - There are hundreds of test in the solution. If no tests run it means the build has failed. Make sure to check and fix build errors and then rerun tests.
+
 ## Code Style Guidelines
 
 ### C# Conventions

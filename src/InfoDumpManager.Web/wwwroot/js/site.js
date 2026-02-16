@@ -24,4 +24,31 @@ document.addEventListener("DOMContentLoaded", () => {
 			}
 		});
 	});
+
+	document.querySelectorAll("form").forEach((form) => {
+		form.addEventListener("submit", () => {
+			if (form.dataset.isSubmitting === "true") {
+				return;
+			}
+
+			form.dataset.isSubmitting = "true";
+
+			form.querySelectorAll('button[type="submit"]').forEach((button) => {
+				if (!(button instanceof HTMLButtonElement)) {
+					return;
+				}
+
+				if (!button.dataset.originalLabel) {
+					button.dataset.originalLabel = button.innerHTML;
+				}
+
+				const processingText = button.dataset.processingText || "Processing...";
+				button.disabled = true;
+				button.setAttribute("aria-busy", "true");
+				button.innerHTML =
+					'<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
+					`<span>${processingText}</span>`;
+			});
+		});
+	});
 });

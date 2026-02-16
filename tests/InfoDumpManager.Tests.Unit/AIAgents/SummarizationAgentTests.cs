@@ -5,6 +5,7 @@ using InfoDumpManager.Application.Services.Caching;
 using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -32,6 +33,7 @@ public sealed class SummarizationAgentTests
             _mockRateLimiter.Object,
             _mockTextCache.Object,
             _mockCostManager.Object,
+            Options.Create(CreateLlmSettings()),
             _mockLogger.Object);
 
         _mockRateLimiter
@@ -74,7 +76,7 @@ public sealed class SummarizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse(expectedSummary, "gpt-4", "test-provider", 50, 0.001m, "completed", 0));
 
         // Act
@@ -106,7 +108,7 @@ public sealed class SummarizationAgentTests
         Assert.False(result.Success);
         Assert.Contains("budget", result.Message.ToLowerInvariant());
         _mockLlmProvider.Verify(
-            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()),
+            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()),
             Times.Never);
     }
 
@@ -122,7 +124,7 @@ public sealed class SummarizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ThrowsAsync(new InvalidOperationException("LLM service unavailable"));
 
         // Act
@@ -160,7 +162,7 @@ public sealed class SummarizationAgentTests
             .ReturnsAsync(new CostCheckResult(true, 0.01m, 100m, "BudgetAvailable", "Budget available."));
 
         _mockLlmProvider
-            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .ReturnsAsync(new LLMResponse("Summary", "gpt-4", "test", expectedTokens, 0.005m, "completed", 0));
 
         // Act
@@ -198,7 +200,7 @@ public sealed class SummarizationAgentTests
         Assert.True(result.Success);
         Assert.Equal("Cached summary", result.Data.Payload["summary"]);
         _mockLlmProvider.Verify(
-            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>()),
+            x => x.CallAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyDictionary<string, string>?>()),
             Times.Never);
     }
 
@@ -213,5 +215,20 @@ public sealed class SummarizationAgentTests
                 100,
                 DateTimeOffset.UtcNow,
                 new Dictionary<string, object>()));
+    }
+
+    private static AgentLlmSettings CreateLlmSettings()
+    {
+        return new AgentLlmSettings
+        {
+            Agents = new Dictionary<string, AgentLlmAgentSettings>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["SummarizationAgent"] = new AgentLlmAgentSettings
+                {
+                    Chat = new LlmEndpointSettings { Provider = "OpenAI", Model = "gpt-4" },
+                    Embedding = new LlmEndpointSettings { Provider = "OpenAI", Model = "text-embedding-3-large" }
+                }
+            }
+        };
     }
 }

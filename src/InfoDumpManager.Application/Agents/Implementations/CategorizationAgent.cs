@@ -4,6 +4,7 @@ using InfoDumpManager.Application.Services.CostManagement;
 using InfoDumpManager.Application.Services.LLM;
 using InfoDumpManager.Domain.Entities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace InfoDumpManager.Application.Agents.Implementations;
 
@@ -15,16 +16,19 @@ public sealed class CategorizationAgent : IAgent
     private readonly ILLMRateLimiter _rateLimiter;
     private readonly ICostManager _costManager;
     private readonly ILogger<CategorizationAgent> _logger;
+    private readonly LlmEndpointSettings _chatSettings;
 
     public CategorizationAgent(
         ILLMProvider llmProvider,
         ILLMRateLimiter rateLimiter,
         ICostManager costManager,
+        IOptions<AgentLlmSettings> llmSettings,
         ILogger<CategorizationAgent> logger)
     {
         _llmProvider = llmProvider;
         _rateLimiter = rateLimiter;
         _costManager = costManager;
+        _chatSettings = llmSettings.Value.GetRequiredAgent(Name).Chat;
         _logger = logger;
     }
 
@@ -59,11 +63,15 @@ public sealed class CategorizationAgent : IAgent
 
             var content = context.ContentText;
 
-            var prompt = BuildPrompt(content, categories);
+            var promptTemplate = BuildPromptTemplate(categories);
+            var promptVariables = new Dictionary<string, string>
+            {
+                ["content"] = content
+            };
 
             var response = await _rateLimiter.ExecuteAsync(
                     context.TenantId,
-                    ct => _llmProvider.CallAsync(prompt, "gpt-4", 220, 0.2f, ct),
+                    ct => _llmProvider.CallAsync(promptTemplate, _chatSettings.Provider, _chatSettings.Model, 220, 0.2f, ct, promptVariables),
                     default)
                 .ConfigureAwait(false);
 
@@ -147,7 +155,7 @@ public sealed class CategorizationAgent : IAgent
             "Fallback selection."));
     }
 
-    private static string BuildPrompt(string content, IReadOnlyCollection<Category> categories)
+    private static string BuildPromptTemplate(IReadOnlyCollection<Category> categories)
     {
         var categoryList = categories.Count == 0
             ? "(none)"
@@ -156,7 +164,7 @@ public sealed class CategorizationAgent : IAgent
         return $@"Analyze this content and select the best category from the list, or propose a new category name.
 
 Content:
-{content}
+" + "{{$content}}" + $@"
 
 Categories:
 {categoryList}
